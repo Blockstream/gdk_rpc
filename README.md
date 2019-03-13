@@ -6,3 +6,11 @@ GDK-RPC library is compatible with https://github.com/blockstream/gdk and allows
 users to use the Green mobile/cli/desktop apps with a Bitcoin or Liquid
 full node including pruned.
 
+
+## Building
+
+Get rust https://rustup.rs/
+
+cd in the repo
+
+cargo build
