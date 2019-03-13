@@ -1,0 +1,15 @@
+language: generic
+sudo: required
+services:
+  - docker
+
+env:
+  global:
+    - DOCKERBUILDER=blockstream/gdk_rpc
+    - DOCKERHASH=0276ae2a427cd3556e41ac397ed2f0ce95404ea04f40373469832683ae9d90e4
+  matrix:
+    - UNUSED=true
+
+
+script:
+  - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo build && ./test.sh"

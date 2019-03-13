@@ -1,0 +1,6 @@
+image: blockstream/gdk_rpc@sha256:0276ae2a427cd3556e41ac397ed2f0ce95404ea04f40373469832683ae9d90e4
+
+test_gdk_rpc_rust_c:
+  script:
+    - cd $CI_PROJECT_DIR
+    - source /root/.cargo/env && cargo build && ./test.sh
