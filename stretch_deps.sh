@@ -8,6 +8,9 @@ apt install --no-install-recommends -yqq build-essential clang curl ca-certifica
 
 curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.33.0
 
+source /root/.cargo/env
+rustup component add rustfmt clippy
+
 if [ -f /.dockerenv ]; then
     apt -yqq autoremove
     apt -yqq clean
