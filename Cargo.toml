@@ -2,7 +2,7 @@
 name = "gdk-rpc"
 version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
-license = "(MIT OR BSD-3-Clause)"
+license = "(MIT)"
 edition = "2018"
 
 [lib]
