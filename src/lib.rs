@@ -51,18 +51,15 @@ impl GA_auth_handler {
     }
 }
 
-fn set_str(output: &mut c_char, data: String) {
+fn set_str(ret: &mut c_char, data: String) {
     let cstr = CString::new(data).unwrap();
     unsafe {
-        libc::strcpy(output, cstr.as_ptr());
+        libc::strcpy(ret, cstr.as_ptr());
     }
 }
 
 fn get_str(s: *const c_char) -> String {
-    unsafe { CStr::from_ptr(s) }
-        .to_str()
-        .unwrap()
-        .to_string()
+    unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
 
 //
@@ -70,8 +67,8 @@ fn get_str(s: *const c_char) -> String {
 //
 
 #[no_mangle]
-pub extern "C" fn GA_get_networks(output: &mut *const GA_json) {
-    *output = GA_json::ptr(json!([ {
+pub extern "C" fn GA_get_networks(ret: &mut *const GA_json) {
+    *ret = GA_json::ptr(json!([ {
         "address_explorer_url": "https://blockstream.info/address/",
         "bech32_prefix": "bc",
         "default_peers": [],
@@ -168,88 +165,80 @@ pub extern "C" fn GA_login(
 //
 
 #[no_mangle]
-pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, output: &mut c_char) {
-    let j = unsafe { &*json };
-    let res = j.0.to_string();
-    println!("GA_convert_json {:?} => {:?}", j.0, res);
-    set_str(output, res);
+pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: &mut c_char) {
+    let json = &unsafe { &*json }.0;
+    let res = json.to_string();
+    println!("GA_convert_json {:?} => {:?}", json, res);
+    set_str(ret, res);
 }
 
 #[no_mangle]
-pub extern "C" fn GA_convert_string_to_json(input: *const c_char, output: &mut *const GA_json) {
-    let cstr = unsafe { CStr::from_ptr(input) };
-    let jstr = cstr.to_str().expect("invalid string for string_to_json");
-    println!("GA_convert_string {:?}", jstr);
-    *output = GA_json::ptr(serde_json::from_str(&jstr).expect("invalid json for string_to_json"));
+pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: &mut *const GA_json) {
+    let jstr = get_str(jstr);
+    let json = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
+    println!("GA_convert_string {:?} => {:?}", jstr, json);
+    *ret = GA_json::ptr(json);
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_json_value_to_string(
     json: *const GA_json,
     path: *const c_char,
-    output: &mut c_char,
+    ret: &mut c_char,
 ) {
-    let j = unsafe { &*json };
-    let path = unsafe { CStr::from_ptr(path) }
-        .to_str()
-        .expect("invalid path");
-    let res = j.0.get(&path).expect("path missing").to_string();
+    let json = &unsafe { &*json }.0;
+    let path = get_str(path);
+    let res = json.get(&path).expect("path missing").to_string();
     println!("GA_convert_json_value_to_string {:?} => {:?}", path, res);
-    set_str(output, res);
+    set_str(ret, res);
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_json_value_to_uint32(
     json: *const GA_json,
     path: *const c_char,
-    output: &mut u32,
+    ret: &mut u32,
 ) {
-    let j = unsafe { &*json };
-    let path = unsafe { CStr::from_ptr(path) }
-        .to_str()
-        .expect("invalid path");
-    let res =
-        j.0.get(&path)
-            .expect("path missing")
-            .as_u64()
-            .expect("invalid number") as u32;
+    let json = &unsafe { &*json }.0;
+    let path = get_str(path);
+    let res = json
+        .get(&path)
+        .expect("path missing")
+        .as_u64()
+        .expect("invalid number") as u32;
     println!("GA_convert_json_value_to_uint32 {:?} => {:?}", path, res);
-    *output = res;
+    *ret = res;
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_json_value_to_uint64(
     json: *const GA_json,
     path: *const c_char,
-    output: &mut u64,
+    ret: &mut u64,
 ) {
-    let j = unsafe { &*json };
-    let path = unsafe { CStr::from_ptr(path) }
-        .to_str()
-        .expect("invalid path");
-    let res =
-        j.0.get(&path)
-            .expect("path missing")
-            .as_u64()
-            .expect("invalid number");
+    let json = &unsafe { &*json }.0;
+    let path = get_str(path);
+    let res = json
+        .get(&path)
+        .expect("path missing")
+        .as_u64()
+        .expect("invalid number");
     println!("GA_convert_json_value_to_uint64 {:?} => {:?}", path, res);
-    *output = res;
+    *ret = res;
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_json_value_to_json(
     json: *const GA_json,
     path: *const c_char,
-    output: &mut *const GA_json,
+    ret: &mut *const GA_json,
 ) {
-    let j = unsafe { &*json };
-    let path = unsafe { CStr::from_ptr(path) }
-        .to_str()
-        .expect("invalid path");
-    let jstr = j.0.get(&path).expect("path missing").to_string();
+    let json = &unsafe { &*json }.0;
+    let path = get_str(path);
+    let jstr = json.get(&path).expect("path missing").to_string();
     let res = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
     println!("GA_convert_json_value_to_json {:?} => {:?}", path, res);
-    *output = GA_json::ptr(res);
+    *ret = GA_json::ptr(res);
 }
 
 #[no_mangle]
