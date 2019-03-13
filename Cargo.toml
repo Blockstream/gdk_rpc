@@ -1,0 +1,16 @@
+[package]
+name = "gdk-rpc"
+version = "0.1.0"
+authors = ["Nadav Ivgi <nadav@shesek.info>"]
+license = "(MIT OR BSD-3-Clause)"
+edition = "2018"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+bitcoincore-rpc = "0.2"
+serde = "1.0"
+serde_json = "1.0"
+libc = "0.2"
+
