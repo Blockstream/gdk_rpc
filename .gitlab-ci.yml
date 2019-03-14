@@ -1,4 +1,4 @@
-image: blockstream/gdk_rpc@sha256:d02d9a6999ac8f9e05b12d2dcf8d3fd0ee5d1c5dfcb5c70efd1f6eaf48a075d5
+image: blockstream/gdk_rpc@sha256:6b21a147e8099d78a9c368bdb297d979f9f93a209bc89b82ce27719c54f1a224
 
 test_gdk_rpc_rust_c:
   script:
