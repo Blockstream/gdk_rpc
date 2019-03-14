@@ -6,14 +6,16 @@
 
 GDK is a cross-platform, cross-language library for Blockstream Green wallets.
 
-GDK-RPC library is compatible with https://github.com/blockstream/gdk and allows
+For an overview of the api see [gdk.readthedocs.io](https://gdk.readthedocs.io).
+
+GDK-RPC library is compatible with [gdk](https://github.com/blockstream/gdk) and allows
 users to use the Green mobile/cli/desktop apps with a Bitcoin or Liquid
 full node including pruned.
 
 
 ## Building
 
-Get rust https://rustup.rs/
+Get [rust](https://rustup.rs)
 
 cd in the repo
 
