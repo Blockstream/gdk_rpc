@@ -74,19 +74,28 @@ fn main() {
         debug!("connected");
 
         let hw_device = make_json(json!({ "type": "trezor" }));
-        let mnemonic = CString::new("plunge wash chimney soap magic luggage bulk mixed chuckle utility come light").unwrap();
+        let mnemonic = CString::new(
+            "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light",
+        )
+        .unwrap();
         let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-        assert_eq!(GA_OK, GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler));
+        assert_eq!(
+            GA_OK,
+            GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler)
+        );
         debug!("registered");
 
         let password = CString::new("").unwrap();
-        assert_eq!(GA_OK, GA_login(
-            sess,
-            hw_device,
-            mnemonic.as_ptr(),
-            password.as_ptr(),
-            &mut auth_handler,
-        ));
+        assert_eq!(
+            GA_OK,
+            GA_login(
+                sess,
+                hw_device,
+                mnemonic.as_ptr(),
+                password.as_ptr(),
+                &mut auth_handler,
+            )
+        );
         debug!("logged in");
 
         let details = make_json(json!({ "page": 0 }));
@@ -107,7 +116,7 @@ fn make_json(val: Value) -> *const GA_json {
     let cstr = CString::new(val.to_string()).unwrap();
     let mut json: *const GA_json = std::ptr::null_mut();
     unsafe {
-       assert_eq!(GA_OK, GA_convert_string_to_json(cstr.as_ptr(), &mut json));
+        assert_eq!(GA_OK, GA_convert_string_to_json(cstr.as_ptr(), &mut json));
     }
     json
 }

@@ -1,13 +1,13 @@
-use std::fmt;
 use hex;
+use std::fmt;
 
+use bip39::{Language, Mnemonic, Seed};
+use bitcoin::{consensus::serialize, Network as BNetwork, PrivateKey, Transaction};
+use bitcoin_hashes::hex::{FromHex, ToHex};
+use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
 use failure::Error;
 use serde_json::Value;
-use bitcoincore_rpc::{RpcApi, Client as RpcClient, Error as CoreError};
-use bip39::{Mnemonic, Language, Seed};
-use bitcoin::{Network as BNetwork, PrivateKey, Transaction, consensus::serialize};
-use bitcoin_hashes::sha256d::Hash as Sha256dHash;
-use bitcoin_hashes::hex::{FromHex, ToHex};
 
 use crate::errors::OptionExt;
 
@@ -30,12 +30,16 @@ impl Wallet {
         let skey = secp256k1::SecretKey::from_slice(&seed.as_bytes()[0..32]).unwrap();
 
         // TODO network
-        let bkey = PrivateKey { compressed: false, network: BNetwork::Testnet, key: skey };
+        let bkey = PrivateKey {
+            compressed: false,
+            network: BNetwork::Testnet,
+            key: skey,
+        };
         let wif = bkey.to_wif();
 
         // XXX this operation is destructive and would replace any prior seed stored in bitcoin core
         // TODO make sure the wallet is unused before doing this!
-        let args = [ json!(true), json!(wif) ];
+        let args = [json!(true), json!(wif)];
         let res: Result<Value, CoreError> = self.rpc.call("sethdseed", &args);
 
         match res {
@@ -43,12 +47,15 @@ impl Wallet {
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
             Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => Ok(()),
             Err(CoreError::JsonRpc(jsonrpc::error::Error::Rpc(rpc_error))) => {
-                if rpc_error.code != -5 || rpc_error.message != "Already have this key (either as an HD seed or as a loose private key)" {
+                if rpc_error.code != -5
+                    || rpc_error.message
+                        != "Already have this key (either as an HD seed or as a loose private key)"
+                {
                     bail!("{:?}", rpc_error)
                 }
                 Ok(())
-            },
-            Err(err) => bail!(err)
+            }
+            Err(err) => bail!(err),
         }
     }
 
@@ -61,16 +68,21 @@ impl Wallet {
         let page = details.get("page").req()?.as_u64().req()? as u32;
 
         // fetch listtranssactions
-        let txdescs = self.rpc.call::<Value>("listtransactions", &[ json!("*"), json!(PER_PAGE), json!(PER_PAGE*page) ])?;
+        let txdescs = self.rpc.call::<Value>(
+            "listtransactions",
+            &[json!("*"), json!(PER_PAGE), json!(PER_PAGE * page)],
+        )?;
         let txdescs = txdescs.as_array().unwrap();
         let potentially_has_more = txdescs.len() as u32 == PER_PAGE;
 
         // fetch full transactions and convert to GDK format
-        let txs = txdescs.into_iter()
+        let txs = txdescs
+            .into_iter()
             .filter(|txdesc| txdesc.get("category").unwrap().as_str().unwrap() != "immature")
             .map(|txdesc| {
                 let txid = Sha256dHash::from_hex(txdesc.get("txid").unwrap().as_str().unwrap())?;
-                let blockhash = Sha256dHash::from_hex(txdesc.get("blockhash").unwrap().as_str().unwrap())?;
+                let blockhash =
+                    Sha256dHash::from_hex(txdesc.get("blockhash").unwrap().as_str().unwrap())?;
                 let tx = self.rpc.get_raw_transaction(&txid, Some(&blockhash))?;
 
                 format_gdk_tx(txdesc, tx)
@@ -100,7 +112,6 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         // TODO deal with immature coinbase txs
         _ => bail!("invalid tx category"),
     };
-
 
     Ok(json!({
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?

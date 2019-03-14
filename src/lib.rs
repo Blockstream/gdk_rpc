@@ -1,16 +1,20 @@
-#![recursion_limit="128"]
+#![recursion_limit = "128"]
 
-extern crate bitcoincore_rpc;
-extern crate jsonrpc;
 extern crate bitcoin;
 extern crate bitcoin_hashes;
-extern crate secp256k1;
+extern crate bitcoincore_rpc;
+extern crate jsonrpc;
 extern crate libc;
+extern crate secp256k1;
 extern crate serde;
-#[macro_use] extern crate serde_json;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate failure;
+#[macro_use]
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate failure;
 
 pub mod errors;
 pub mod network;
@@ -190,7 +194,7 @@ pub extern "C" fn GA_login(
 
     if read_str(password).len() > 0 {
         println!("password-encrypted mnemonics are unsupported");
-        return GA_ERROR
+        return GA_ERROR;
     }
 
     if let Err(err) = wallet.login(&mnemonic) {
@@ -211,28 +215,30 @@ pub extern "C" fn GA_login(
 //
 
 #[no_mangle]
-pub extern "C" fn GA_get_transactions(sess: *const GA_session, details: *const GA_json, ret: *mut *const GA_json) -> i32 {
+pub extern "C" fn GA_get_transactions(
+    sess: *const GA_session,
+    details: *const GA_json,
+    ret: *mut *const GA_json,
+) -> i32 {
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
     let wallet = match sess.wallet {
         Some(ref wallet) => wallet,
-        None => return GA_ERROR
+        None => return GA_ERROR,
     };
 
     let txs = match wallet.get_transactions(&details) {
         Err(err) => {
             println!("Wallet::list_transactions() failed: {:?}", err);
-            return GA_ERROR
-        },
+            return GA_ERROR;
+        }
         Ok(txs) => txs,
     };
 
     // XXX should we free details or should the client?
 
-    unsafe {
-        *ret = GA_json::ptr(json!(txs))
-    }
+    unsafe { *ret = GA_json::ptr(json!(txs)) }
 
     GA_OK
 }
