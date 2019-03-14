@@ -70,24 +70,26 @@ fn get_str(s: *const c_char) -> String {
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
-    unsafe{*ret = GA_json::ptr(json!([ {
-        "address_explorer_url": "https://blockstream.info/address/",
-        "bech32_prefix": "bc",
-        "default_peers": [],
-        "development": false,
-        "liquid": false,
-        "mainnet": true,
-        "name": "Bitcoin",
-        "network": "mainnet",
-        "p2pkh_version": 0,
-        "p2sh_version": 5,
-        "service_chain_code": "",
-        "service_pubkey": "",
-        "tx_explorer_url": "https://blockstream.info/tx/",
-        "wamp_cert_pins": [],
-        "wamp_onion_url": "",
-        "wamp_url": ""
-    } ]));}
+    unsafe {
+        *ret = GA_json::ptr(json!([ {
+            "address_explorer_url": "https://blockstream.info/address/",
+            "bech32_prefix": "bc",
+            "default_peers": [],
+            "development": false,
+            "liquid": false,
+            "mainnet": true,
+            "name": "Bitcoin",
+            "network": "mainnet",
+            "p2pkh_version": 0,
+            "p2sh_version": 5,
+            "service_chain_code": "",
+            "service_pubkey": "",
+            "tx_explorer_url": "https://blockstream.info/tx/",
+            "wamp_cert_pins": [],
+            "wamp_onion_url": "",
+            "wamp_url": ""
+        } ]));
+    }
 }
 
 // GA_generate_mnemonic
@@ -100,7 +102,9 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) {
     println!("GA_create_session()");
-    unsafe{*ret = GA_session::ptr(1234);}
+    unsafe {
+        *ret = GA_session::ptr(1234);
+    }
 }
 
 #[no_mangle]
@@ -138,7 +142,9 @@ pub extern "C" fn GA_register_user(
     let mnemonic = get_str(mnemonic);
 
     sess.uid = Some(9876);
-    unsafe { *auth_handler = GA_auth_handler::ptr(0); }
+    unsafe {
+        *auth_handler = GA_auth_handler::ptr(0);
+    }
 
     println!("GA_register_user({}) {:?}", mnemonic, sess);
 }
@@ -157,7 +163,9 @@ pub extern "C" fn GA_login(
     let password = get_str(password);
 
     sess.uid = Some(9876);
-    unsafe { *auth_handler = GA_auth_handler::ptr(0); }
+    unsafe {
+        *auth_handler = GA_auth_handler::ptr(0);
+    }
 
     println!("GA_login({}, {}) {:?}", mnemonic, password, sess);
 }
@@ -179,7 +187,9 @@ pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *cons
     let jstr = get_str(jstr);
     let json = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
     println!("GA_convert_string {:?} => {:?}", jstr, json);
-    unsafe { *ret = GA_json::ptr(json); }
+    unsafe {
+        *ret = GA_json::ptr(json);
+    }
 }
 
 #[no_mangle]
@@ -209,7 +219,9 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
         .as_u64()
         .expect("invalid number") as u32;
     println!("GA_convert_json_value_to_uint32 {:?} => {:?}", path, res);
-    unsafe { *ret = res; }
+    unsafe {
+        *ret = res;
+    }
 }
 
 #[no_mangle]
@@ -226,7 +238,9 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
         .as_u64()
         .expect("invalid number");
     println!("GA_convert_json_value_to_uint64 {:?} => {:?}", path, res);
-    unsafe { *ret = res; }
+    unsafe {
+        *ret = res;
+    }
 }
 
 #[no_mangle]
@@ -240,7 +254,9 @@ pub extern "C" fn GA_convert_json_value_to_json(
     let jstr = json.get(&path).expect("path missing").to_string();
     let res = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
     println!("GA_convert_json_value_to_json {:?} => {:?}", path, res);
-    unsafe { *ret = GA_json::ptr(res); }
+    unsafe {
+        *ret = GA_json::ptr(res);
+    }
 }
 
 #[no_mangle]

@@ -3,10 +3,13 @@ extern crate serde_json;
 
 use serde_json::Value;
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
-#[repr(C)] pub struct GA_json { _private: [u8; 0] }
+#[repr(C)]
+pub struct GA_json {
+    _private: [u8; 0],
+}
 
 #[link(name = "gdk_rpc")]
 extern "C" {
@@ -17,7 +20,9 @@ extern "C" {
 #[test]
 fn main() {
     let mut nets: *const GA_json = std::ptr::null_mut();
-    unsafe { GA_get_networks(&mut nets); }
+    unsafe {
+        GA_get_networks(&mut nets);
+    }
     println!("networks: {:#?}\n", json_obj(nets))
 }
 
