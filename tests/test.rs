@@ -64,8 +64,13 @@ fn main() {
         GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler);
 
         let password = CString::new("horse battery").unwrap();
-        GA_login(sess, hw_device, mnemonic.as_ptr(), password.as_ptr(), &mut auth_handler);
-
+        GA_login(
+            sess,
+            hw_device,
+            mnemonic.as_ptr(),
+            password.as_ptr(),
+            &mut auth_handler,
+        );
     }
 }
 
