@@ -10,6 +10,8 @@ use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
 
+// TODO: return status
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct GA_json(Value);
@@ -51,10 +53,10 @@ impl GA_auth_handler {
     }
 }
 
-fn set_str(ret: &mut c_char, data: String) {
+fn set_str(ret: *mut *mut c_char, data: String) {
     let cstr = CString::new(data).unwrap();
     unsafe {
-        libc::strcpy(ret, cstr.as_ptr());
+        *ret = cstr.into_raw();
     }
 }
 
@@ -67,8 +69,8 @@ fn get_str(s: *const c_char) -> String {
 //
 
 #[no_mangle]
-pub extern "C" fn GA_get_networks(ret: &mut *const GA_json) {
-    *ret = GA_json::ptr(json!([ {
+pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
+    unsafe{*ret = GA_json::ptr(json!([ {
         "address_explorer_url": "https://blockstream.info/address/",
         "bech32_prefix": "bc",
         "default_peers": [],
@@ -85,7 +87,7 @@ pub extern "C" fn GA_get_networks(ret: &mut *const GA_json) {
         "wamp_cert_pins": [],
         "wamp_onion_url": "",
         "wamp_url": ""
-    } ]));
+    } ]));}
 }
 
 // GA_generate_mnemonic
@@ -96,9 +98,9 @@ pub extern "C" fn GA_get_networks(ret: &mut *const GA_json) {
 //
 
 #[no_mangle]
-pub extern "C" fn GA_create_session(ret: &mut *const GA_session) {
+pub extern "C" fn GA_create_session(ret: *mut *const GA_session) {
     println!("GA_create_session()");
-    *ret = GA_session::ptr(1234);
+    unsafe{*ret = GA_session::ptr(1234);}
 }
 
 #[no_mangle]
@@ -165,7 +167,8 @@ pub extern "C" fn GA_login(
 //
 
 #[no_mangle]
-pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: &mut c_char) {
+pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *mut c_char) {
+//pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut c_char) {
     let json = &unsafe { &*json }.0;
     let res = json.to_string();
     println!("GA_convert_json {:?} => {:?}", json, res);
@@ -184,7 +187,7 @@ pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: &mut *cons
 pub extern "C" fn GA_convert_json_value_to_string(
     json: *const GA_json,
     path: *const c_char,
-    ret: &mut c_char,
+    ret: *mut *mut c_char,
 ) {
     let json = &unsafe { &*json }.0;
     let path = get_str(path);
@@ -246,5 +249,13 @@ pub extern "C" fn GA_destroy_json(ptr: *mut GA_json) {
     // TODO make sure this works
     unsafe {
         drop(&*ptr);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn GA_destroy_string(ptr: *mut c_char) {
+    unsafe {
+        // retake pointer and drop
+        let _ = CString::from_raw(ptr);
     }
 }
