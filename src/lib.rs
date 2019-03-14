@@ -1,4 +1,7 @@
 extern crate bitcoincore_rpc;
+extern crate jsonrpc;
+extern crate bitcoin;
+extern crate secp256k1;
 extern crate libc;
 extern crate serde;
 #[macro_use]
@@ -9,6 +12,7 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 pub mod network;
+pub mod wallet;
 
 use serde_json::Value;
 
@@ -17,6 +21,7 @@ use std::mem::transmute;
 use std::os::raw::c_char;
 
 use network::Network;
+use wallet::Wallet;
 
 const GA_OK: i32 = 0;
 const GA_ERROR: i32 = -1;
@@ -40,6 +45,7 @@ pub struct GA_session {
     uid: Option<u32>,
     network: Option<String>,
     log_level: Option<u32>,
+    wallet: Option<Wallet>,
 }
 
 impl GA_session {
@@ -49,6 +55,7 @@ impl GA_session {
             uid: None,
             network: None,
             log_level: None,
+            wallet: None,
         };
         unsafe { transmute(Box::new(sess)) }
     }
@@ -116,9 +123,12 @@ pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_
     }
 
     let rpc = Network::client(&network).unwrap();
+    let wallet = Wallet::new(&rpc);
 
     sess.network = Some(network);
     sess.log_level = Some(log_level);
+    sess.wallet = Some(wallet);
+
     println!("GA_connect() {:?}", sess);
 
     println!("GA_connect() client: {:?}", rpc.get_blockchain_info());
@@ -138,17 +148,23 @@ pub extern "C" fn GA_register_user(
     _hw_device: *const GA_json,
     mnemonic: *const c_char,
     auth_handler: *mut *const GA_auth_handler,
-) {
+) -> i32 {
     let sess = unsafe { &mut *sess };
+    let wallet = sess.wallet.as_ref().unwrap();
+
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
+
+    println!("GA_register_user({}) {:?}", mnemonic, sess);
+
+    wallet.register(mnemonic, None);
 
     sess.uid = Some(9876);
     unsafe {
         *auth_handler = GA_auth_handler::ptr(0);
     }
 
-    println!("GA_register_user({}) {:?}", mnemonic, sess);
+    GA_OK
 }
 
 #[no_mangle]

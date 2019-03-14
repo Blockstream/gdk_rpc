@@ -59,7 +59,7 @@ fn main() {
         GA_connect(sess, network.as_ptr(), 5);
 
         let hw_device = make_json(json!({ "type": "trezor" }));
-        let mnemonic = CString::new("kite kite kite").unwrap();
+        let mnemonic = CString::new("plunge wash chimney soap magic luggage bulk mixed chuckle utility come light").unwrap();
         let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
         GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler);
 
