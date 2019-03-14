@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use crate::errors::OptionExt;
 
+const SAT_PER_BTC: f64 = 100_000_000.0;
 const PER_PAGE: u32 = 10;
 
 pub struct Wallet {
@@ -103,13 +104,19 @@ impl fmt::Debug for Wallet {
     }
 }
 
+fn btc_to_sat(amount: f64) -> u64 {
+    (amount * SAT_PER_BTC) as u64
+}
+
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
+    println!("tx: {:#?}", txdesc);
+    let fee = txdesc.get("fee").map_or(0, |f| btc_to_sat(f.as_f64().unwrap() * -1.0));
     let weight = tx.get_weight();
+    let vsize = (weight as f32/4.0) as u32;
     let type_str = match txdesc.get("category").req()?.as_str().req()? {
         "send" => "outgoing",
         "receive" => "incoming",
-        // TODO deal with immature coinbase txs
         _ => bail!("invalid tx category"),
     };
 
@@ -125,7 +132,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "transaction_version": tx.version,
         "transaction_locktime": tx.lock_time,
         "transaction_size": rawtx.len(),
-        "transaction_vsize": (weight as f32/4.0) as u32,
+        "transaction_vsize": vsize,
         "transaction_weight": weight,
 
         "rbf_optin": txdesc.get("bip125-replaceable").req()?.as_str().req()? == "yes",
@@ -136,9 +143,8 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "user_signed": true,
         "instant": false,
 
-        "calculated_fee_rate": 0, // TODO not easily available?
-        "fee": 0, // TODO
-        "fee_rate": 0, // TODO
+        "fee": fee,
+        "fee_rate": (fee as f64)/(vsize as f64),
 
         //"inputs": tx.input.iter().map(format_gdk_input).collect(),
         //"outputs": tx.output.iter().map(format_gdk_output).collect(),

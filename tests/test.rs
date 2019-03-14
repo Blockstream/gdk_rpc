@@ -101,7 +101,7 @@ fn main() {
         let details = make_json(json!({ "page": 0 }));
         let mut txs: *const GA_json = std::ptr::null_mut();
         assert_eq!(GA_OK, GA_get_transactions(sess, details, &mut txs));
-        debug!("txs: {:?}\n", json_obj(txs));
+        debug!("txs: {:#?}\n", json_obj(txs));
     }
 }
 
