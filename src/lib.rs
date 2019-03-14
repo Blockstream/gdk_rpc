@@ -159,7 +159,7 @@ pub extern "C" fn GA_login(
     let mnemonic = read_str(mnemonic);
     let password = read_str(password);
 
-    sess.uid = Some(9876);
+    sess.uid = Some(987611);
     unsafe {
         *auth_handler = GA_auth_handler::ptr(0);
     }

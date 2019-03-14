@@ -33,6 +33,13 @@ extern "C" {
         mnemonic: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
     );
+    fn GA_login(
+        sess: *mut GA_session,
+        _hw_device: *const GA_json,
+        mnemonic: *const c_char,
+        password: *const c_char,
+        auth_handler: *mut *const GA_auth_handler,
+    );
 
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char);
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json);
@@ -54,8 +61,11 @@ fn main() {
         let hw_device = make_json(json!({ "type": "trezor" }));
         let mnemonic = CString::new("kite kite kite").unwrap();
         let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-
         GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler);
+
+        let password = CString::new("horse battery").unwrap();
+        GA_login(sess, hw_device, mnemonic.as_ptr(), password.as_ptr(), &mut auth_handler);
+
     }
 }
 
