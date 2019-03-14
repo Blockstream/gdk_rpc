@@ -1,6 +1,9 @@
+#![recursion_limit="128"]
+
 extern crate bitcoincore_rpc;
 extern crate jsonrpc;
 extern crate bitcoin;
+extern crate bitcoin_hashes;
 extern crate secp256k1;
 extern crate libc;
 extern crate serde;
@@ -9,9 +12,11 @@ extern crate serde;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate failure;
 
+pub mod errors;
 pub mod network;
 pub mod wallet;
 
+use bitcoincore_rpc::RpcApi;
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
@@ -40,7 +45,6 @@ impl GA_json {
 #[repr(C)]
 pub struct GA_session {
     sid: u32,
-    uid: Option<u32>,
     network: Option<String>,
     log_level: Option<u32>,
     wallet: Option<Wallet>,
@@ -50,7 +54,6 @@ impl GA_session {
     fn ptr(sid: u32) -> *const GA_session {
         let sess = GA_session {
             sid,
-            uid: None,
             network: None,
             log_level: None,
             wallet: None,
@@ -164,7 +167,6 @@ pub extern "C" fn GA_register_user(
         return GA_ERROR;
     }
 
-    sess.uid = Some(9876);
     unsafe {
         *auth_handler = GA_auth_handler::ptr(0);
     }
@@ -196,12 +198,42 @@ pub extern "C" fn GA_login(
         return GA_ERROR;
     }
 
-    sess.uid = Some(987611);
     unsafe {
         *auth_handler = GA_auth_handler::ptr(0);
     }
 
     println!("GA_login({}) {:?}", mnemonic, sess);
+    GA_OK
+}
+
+//
+// Transactions & Coins
+//
+
+#[no_mangle]
+pub extern "C" fn GA_get_transactions(sess: *const GA_session, details: *const GA_json, ret: *mut *const GA_json) -> i32 {
+    let sess = unsafe { &*sess };
+    let details = &unsafe { &*details }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR
+    };
+
+    let txs = match wallet.get_transactions(&details) {
+        Err(err) => {
+            println!("Wallet::list_transactions() failed: {:?}", err);
+            return GA_ERROR
+        },
+        Ok(txs) => txs,
+    };
+
+    // XXX should we free details or should the client?
+
+    unsafe {
+        *ret = GA_json::ptr(json!(txs))
+    }
+
     GA_OK
 }
 

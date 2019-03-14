@@ -45,6 +45,11 @@ extern "C" {
         password: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
     ) -> i32;
+    fn GA_get_transactions(
+        sess: *mut GA_session,
+        details: *const GA_json,
+        ret: *mut *const GA_json,
+    ) -> i32;
 
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
@@ -83,6 +88,11 @@ fn main() {
             &mut auth_handler,
         ));
         debug!("logged in");
+
+        let details = make_json(json!({ "page": 0 }));
+        let mut txs: *const GA_json = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_transactions(sess, details, &mut txs));
+        debug!("txs: {:?}\n", json_obj(txs));
     }
 }
 
