@@ -1,14 +1,25 @@
 extern crate bitcoincore_rpc;
+extern crate libc;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
-extern crate libc;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate lazy_static;
+
+pub mod network;
 
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
+
+use network::Network;
+
+const GA_OK: i32 = 0;
+const GA_ERROR: i32 = -1;
 
 // TODO: return status
 
@@ -68,24 +79,7 @@ fn read_str(s: *const c_char) -> String {
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
     unsafe {
-        *ret = GA_json::ptr(json!([ {
-            "address_explorer_url": "https://blockstream.info/address/",
-            "bech32_prefix": "bc",
-            "default_peers": [],
-            "development": false,
-            "liquid": false,
-            "mainnet": true,
-            "name": "Bitcoin",
-            "network": "mainnet",
-            "p2pkh_version": 0,
-            "p2sh_version": 5,
-            "service_chain_code": "",
-            "service_pubkey": "",
-            "tx_explorer_url": "https://blockstream.info/tx/",
-            "wamp_cert_pins": [],
-            "wamp_onion_url": "",
-            "wamp_url": ""
-        } ]));
+        *ret = GA_json::ptr(json!(Network::networks()));
     }
 }
 
@@ -112,12 +106,23 @@ pub extern "C" fn GA_destroy_session(sess: *const GA_session) {
 }
 
 #[no_mangle]
-pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) {
+pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32 {
     let sess = unsafe { &mut *sess };
     let network = read_str(network);
+
+    if Network::network(&network).is_none() {
+        // network does not exists
+        return GA_ERROR;
+    }
+
+    let rpc = Network::client(&network).unwrap();
+
     sess.network = Some(network);
     sess.log_level = Some(log_level);
     println!("GA_connect() {:?}", sess);
+
+    println!("GA_connect() client: {:?}", rpc.get_blockchain_info());
+    GA_OK
 }
 
 #[no_mangle]

@@ -55,7 +55,7 @@ fn main() {
         let mut sess: *mut GA_session = std::ptr::null_mut();
         GA_create_session(&mut sess);
 
-        let network = CString::new("mainnet").unwrap();
+        let network = CString::new("regtest").unwrap();
         GA_connect(sess, network.as_ptr(), 5);
 
         let hw_device = make_json(json!({ "type": "trezor" }));
