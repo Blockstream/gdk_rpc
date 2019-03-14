@@ -159,7 +159,7 @@ pub extern "C" fn GA_register_user(
 
     println!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    if let Err(err) = wallet.register(mnemonic, None) {
+    if let Err(err) = wallet.register(&mnemonic) {
         println!("failed registering wallet: {}", err);
         return GA_ERROR;
     }
@@ -181,16 +181,27 @@ pub extern "C" fn GA_login(
     auth_handler: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
+    let wallet = sess.wallet.as_ref().unwrap();
+
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
-    let password = read_str(password);
+
+    if read_str(password).len() > 0 {
+        println!("password-encrypted mnemonics are unsupported");
+        return GA_ERROR
+    }
+
+    if let Err(err) = wallet.login(&mnemonic) {
+        println!("login failed: {}", err);
+        return GA_ERROR;
+    }
 
     sess.uid = Some(987611);
     unsafe {
         *auth_handler = GA_auth_handler::ptr(0);
     }
 
-    println!("GA_login({}, {}) {:?}", mnemonic, password, sess);
+    println!("GA_login({}) {:?}", mnemonic, sess);
     GA_OK
 }
 

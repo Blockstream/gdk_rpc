@@ -16,11 +16,9 @@ impl Wallet {
         Wallet { rpc }
     }
 
-    // TODO -> Result
-    // TODO password is only known at login
-    pub fn register(&self, mnemonic: String, password: Option<String>) -> Result<(), Error> {
+    pub fn register(&self, mnemonic: &String) -> Result<(), Error> {
         let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
-        let seed = Seed::new(&mnem, &password.unwrap_or("".to_string()));
+        let seed = Seed::new(&mnem, "");
 
         // TODO seed -> secret key conversion
         let skey = secp256k1::SecretKey::from_slice(&seed.as_bytes()[0..32]).unwrap();
@@ -29,7 +27,7 @@ impl Wallet {
         let bkey = PrivateKey { compressed: false, network: BNetwork::Testnet, key: skey };
         let wif = bkey.to_wif();
 
-        // XXX this operation is descrutive and would replace any prior seed stored in bitcoin core
+        // XXX this operation is destructive and would replace any prior seed stored in bitcoin core
         // TODO make sure the wallet is unused before doing this!
         let args = [ json!(true), json!(wif) ];
         let res: Result<Value, CoreError> = self.rpc.call("sethdseed", &args);
@@ -46,6 +44,11 @@ impl Wallet {
             },
             Err(err) => bail!(err)
         }
+    }
+
+    pub fn login(&self, mnemonic: &String) -> Result<(), Error> {
+        // just as pass-through to register for now
+        self.register(mnemonic)
     }
 }
 

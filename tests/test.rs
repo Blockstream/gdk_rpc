@@ -74,7 +74,7 @@ fn main() {
         assert_eq!(GA_OK, GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler));
         debug!("registered");
 
-        let password = CString::new("horse battery").unwrap();
+        let password = CString::new("").unwrap();
         assert_eq!(GA_OK, GA_login(
             sess,
             hw_device,
