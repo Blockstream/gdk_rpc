@@ -82,10 +82,11 @@ fn read_str(s: *const c_char) -> String {
 //
 
 #[no_mangle]
-pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
+pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
     unsafe {
         *ret = GA_json::ptr(json!(Network::networks()));
     }
+    GA_OK
 }
 
 // GA_generate_mnemonic
@@ -96,18 +97,20 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) {
 //
 
 #[no_mangle]
-pub extern "C" fn GA_create_session(ret: *mut *const GA_session) {
+pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     println!("GA_create_session()");
     unsafe {
         *ret = GA_session::ptr(1234);
     }
+    GA_OK
 }
 
 #[no_mangle]
-pub extern "C" fn GA_destroy_session(sess: *const GA_session) {
+pub extern "C" fn GA_destroy_session(sess: *const GA_session) -> i32 {
     unsafe {
         drop(&*sess);
     }
+    GA_OK
 }
 
 #[no_mangle]
@@ -134,10 +137,11 @@ pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_
 }
 
 #[no_mangle]
-pub extern "C" fn GA_disconnect(sess: *mut GA_session) {
+pub extern "C" fn GA_disconnect(sess: *mut GA_session) -> i32 {
     let sess = unsafe { &mut *sess };
     sess.network = None;
     println!("GA_disconnect() {:?}", sess);
+    GA_OK
 }
 
 #[no_mangle]
@@ -175,7 +179,7 @@ pub extern "C" fn GA_login(
     mnemonic: *const c_char,
     password: *const c_char,
     auth_handler: *mut *const GA_auth_handler,
-) {
+) -> i32 {
     let sess = unsafe { &mut *sess };
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
@@ -187,6 +191,7 @@ pub extern "C" fn GA_login(
     }
 
     println!("GA_login({}, {}) {:?}", mnemonic, password, sess);
+    GA_OK
 }
 
 //
@@ -194,23 +199,25 @@ pub extern "C" fn GA_login(
 //
 
 #[no_mangle]
-pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) {
+pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32 {
     let json = &unsafe { &*json }.0;
     let res = json.to_string();
     println!("GA_convert_json {:?} => {:?}", json, res);
     unsafe {
         *ret = make_str(res);
     }
+    GA_OK
 }
 
 #[no_mangle]
-pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) {
+pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
     let jstr = read_str(jstr);
     let json = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
     println!("GA_convert_string {:?} => {:?}", jstr, json);
     unsafe {
         *ret = GA_json::ptr(json);
     }
+    GA_OK
 }
 
 #[no_mangle]
@@ -218,7 +225,7 @@ pub extern "C" fn GA_convert_json_value_to_string(
     json: *const GA_json,
     path: *const c_char,
     ret: *mut *const c_char,
-) {
+) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json.get(&path).expect("path missing").to_string();
@@ -226,6 +233,7 @@ pub extern "C" fn GA_convert_json_value_to_string(
     unsafe {
         *ret = make_str(res);
     }
+    GA_OK
 }
 
 #[no_mangle]
@@ -233,7 +241,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
     json: *const GA_json,
     path: *const c_char,
     ret: *mut u32,
-) {
+) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json
@@ -245,6 +253,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
     unsafe {
         *ret = res;
     }
+    GA_OK
 }
 
 #[no_mangle]
@@ -252,7 +261,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
     json: *const GA_json,
     path: *const c_char,
     ret: *mut u64,
-) {
+) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json
@@ -264,6 +273,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
     unsafe {
         *ret = res;
     }
+    GA_OK
 }
 
 #[no_mangle]
@@ -271,7 +281,7 @@ pub extern "C" fn GA_convert_json_value_to_json(
     json: *const GA_json,
     path: *const c_char,
     ret: *mut *const GA_json,
-) {
+) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let jstr = json.get(&path).expect("path missing").to_string();
@@ -280,20 +290,23 @@ pub extern "C" fn GA_convert_json_value_to_json(
     unsafe {
         *ret = GA_json::ptr(res);
     }
+    GA_OK
 }
 
 #[no_mangle]
-pub extern "C" fn GA_destroy_json(ptr: *mut GA_json) {
+pub extern "C" fn GA_destroy_json(ptr: *mut GA_json) -> i32 {
     // TODO make sure this works
     unsafe {
         drop(&*ptr);
     }
+    GA_OK
 }
 
 #[no_mangle]
-pub extern "C" fn GA_destroy_string(ptr: *mut c_char) {
+pub extern "C" fn GA_destroy_string(ptr: *mut c_char) -> i32 {
     unsafe {
         // retake pointer and drop
         let _ = CString::from_raw(ptr);
     }
+    GA_OK
 }
