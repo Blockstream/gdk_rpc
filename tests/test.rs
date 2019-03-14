@@ -1,11 +1,16 @@
 extern crate libc;
+extern crate stderrlog;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate log;
 
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+
+const GA_OK: i32 = 0;
 
 #[repr(C)]
 pub struct GA_json {
@@ -24,59 +29,66 @@ pub struct GA_auth_handler {
 
 #[link(name = "gdk_rpc")]
 extern "C" {
-    fn GA_get_networks(ret: *mut *const GA_json);
-    fn GA_create_session(ret: *mut *mut GA_session);
-    fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32);
+    fn GA_get_networks(ret: *mut *const GA_json) -> i32;
+    fn GA_create_session(ret: *mut *mut GA_session) -> i32;
+    fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
     fn GA_register_user(
         sess: *mut GA_session,
         _hw_device: *const GA_json,
         mnemonic: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
-    );
+    ) -> i32;
     fn GA_login(
         sess: *mut GA_session,
         _hw_device: *const GA_json,
         mnemonic: *const c_char,
         password: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
-    );
+    ) -> i32;
 
-    fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char);
-    fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json);
+    fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
+    fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 }
 
 #[test]
 fn main() {
+    //stderrlog::new().module(module_path!()).init().unwrap();
+    stderrlog::new().verbosity(3).init().unwrap();
+
     unsafe {
         let mut nets: *const GA_json = std::ptr::null_mut();
-        GA_get_networks(&mut nets);
-        println!("networks: {:#?}\n", json_obj(nets));
+        assert_eq!(GA_OK, GA_get_networks(&mut nets));
+        debug!("networks: {:?}\n", json_obj(nets));
 
         let mut sess: *mut GA_session = std::ptr::null_mut();
-        GA_create_session(&mut sess);
+        assert_eq!(GA_OK, GA_create_session(&mut sess));
+        debug!("obtained session");
 
         let network = CString::new("regtest").unwrap();
-        GA_connect(sess, network.as_ptr(), 5);
+        assert_eq!(GA_OK, GA_connect(sess, network.as_ptr(), 5));
+        debug!("connected");
 
         let hw_device = make_json(json!({ "type": "trezor" }));
         let mnemonic = CString::new("plunge wash chimney soap magic luggage bulk mixed chuckle utility come light").unwrap();
         let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-        GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler);
+        assert_eq!(GA_OK, GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler));
+        debug!("registered");
 
         let password = CString::new("horse battery").unwrap();
-        GA_login(
+        assert_eq!(GA_OK, GA_login(
             sess,
             hw_device,
             mnemonic.as_ptr(),
             password.as_ptr(),
             &mut auth_handler,
-        );
+        ));
+        debug!("logged in");
     }
 }
 
 fn json_obj(json: *const GA_json) -> Value {
     let mut s: *const c_char = std::ptr::null_mut();
-    unsafe { GA_convert_json_to_string(json, &mut s) };
+    unsafe { assert_eq!(GA_OK, GA_convert_json_to_string(json, &mut s)) };
     let s = unsafe { CStr::from_ptr(s) }.to_str().unwrap();
     serde_json::from_str(&s).unwrap()
 }
@@ -85,7 +97,7 @@ fn make_json(val: Value) -> *const GA_json {
     let cstr = CString::new(val.to_string()).unwrap();
     let mut json: *const GA_json = std::ptr::null_mut();
     unsafe {
-        GA_convert_string_to_json(cstr.as_ptr(), &mut json);
+       assert_eq!(GA_OK, GA_convert_string_to_json(cstr.as_ptr(), &mut json));
     }
     json
 }
