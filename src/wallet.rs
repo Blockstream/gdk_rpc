@@ -1,5 +1,6 @@
 use std::fmt;
 
+use failure::Error;
 use serde_json::Value;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError};
 use bip39::{Mnemonic, Language, Seed};
@@ -17,8 +18,8 @@ impl Wallet {
 
     // TODO -> Result
     // TODO password is only known at login
-    pub fn register(&self, mnemonic: String, password: Option<String>) -> bool {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).unwrap();
+    pub fn register(&self, mnemonic: String, password: Option<String>) -> Result<(), Error> {
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
         let seed = Seed::new(&mnem, &password.unwrap_or("".to_string()));
 
         // TODO seed -> secret key conversion
@@ -30,20 +31,20 @@ impl Wallet {
 
         // XXX this operation is descrutive and would replace any prior seed stored in bitcoin core
         // TODO make sure the wallet is unused before doing this!
-        let args = [ serde_json::to_value(true).unwrap(), serde_json::to_value(wif).unwrap() ];
+        let args = [ json!(true), json!(wif) ];
         let res: Result<Value, CoreError> = self.rpc.call("sethdseed", &args);
 
         match res {
-            Ok(_) => true,
+            Ok(_) => Ok(()),
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
-            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => true,
+            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => Ok(()),
             Err(CoreError::JsonRpc(jsonrpc::error::Error::Rpc(rpc_error))) => {
                 if rpc_error.code != -5 || rpc_error.message != "Already have this key (either as an HD seed or as a loose private key)" {
-                    panic!("{:?}", rpc_error)
+                    bail!("{:?}", rpc_error)
                 }
-                true
+                Ok(())
             },
-            Err(err) => panic!("{:?}", err),
+            Err(err) => bail!(err)
         }
     }
 }

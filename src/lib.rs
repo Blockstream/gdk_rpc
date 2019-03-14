@@ -4,12 +4,10 @@ extern crate bitcoin;
 extern crate secp256k1;
 extern crate libc;
 extern crate serde;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate lazy_static;
+#[macro_use] extern crate serde_json;
+#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate failure;
 
 pub mod network;
 pub mod wallet;
@@ -157,7 +155,10 @@ pub extern "C" fn GA_register_user(
 
     println!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    wallet.register(mnemonic, None);
+    if let Err(err) = wallet.register(mnemonic, None) {
+        println!("failed registering wallet: {}", err);
+        return GA_ERROR;
+    }
 
     sess.uid = Some(9876);
     unsafe {
