@@ -283,7 +283,11 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
 }
 
 #[no_mangle]
-pub extern "C" fn GA_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32 {
+pub extern "C" fn GA_get_subaccount(
+    sess: *const GA_session,
+    index: u32,
+    ret: *mut *const GA_json,
+) -> i32 {
     let sess = unsafe { &*sess };
 
     if index != 0 {
