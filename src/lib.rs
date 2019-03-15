@@ -3,6 +3,7 @@
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
+extern crate dirs;
 extern crate jsonrpc;
 extern crate libc;
 extern crate secp256k1;

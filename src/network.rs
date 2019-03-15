@@ -1,4 +1,5 @@
 use bitcoincore_rpc::Client;
+use dirs;
 use failure::Error;
 use std::collections::HashMap;
 use std::env;
@@ -68,7 +69,7 @@ impl Network {
 fn read_cookie() -> Result<(String, String), Error> {
     let path = env::var("BITCOIND_DIR").ok().map_or_else(
         || {
-            env::home_dir()
+            dirs::home_dir()
                 .unwrap()
                 .join(".bitcoin")
                 .join("regtest")
