@@ -553,7 +553,7 @@ pub extern "C" fn GA_destroy_auth_handler(auth_handler: *const GA_auth_handler) 
 }
 
 //
-// Currency conversion
+// Currency conversion & fees
 //
 
 #[no_mangle]
@@ -605,8 +605,29 @@ pub extern "C" fn GA_convert_amount(
 
     GA_OK
 }
+#[no_mangle]
+pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
+    let sess = unsafe { &*sess };
 
-// TODO: GA_get_fee_estimates, GA_generate_mnemonic
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let estimates = match wallet.get_fee_estimates() {
+        Err(err) => {
+            println!("get_estimates failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(estimates) => estimates,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(estimates);
+    }
+
+    GA_OK
+}
 
 //
 // JSON utilities

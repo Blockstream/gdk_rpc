@@ -6,6 +6,7 @@ use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bitcoin::{consensus::serialize, Address, Network as BNetwork, PrivateKey, Transaction, TxOut};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
 use failure::Error;
 use serde_json::Value;
@@ -202,6 +203,31 @@ impl Wallet {
 
     pub fn get_receive_address(&self) -> Result<String, Error> {
         Ok(self.rpc.get_new_address(None, None)?)
+    }
+
+    pub fn get_fee_estimates(&self) -> Result<Value, Error> {
+        // TODO
+        let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
+        let minrelayfee = json!(btc_to_usat(
+            mempoolinfo.get("minrelaytxfee").req()?.as_f64().req()? / 1000.0
+        ));
+
+        let mut estimates: Vec<Value> = (2u16..24u16)
+            .into_iter()
+            .map(|target| {
+                let est: EstimateSmartFeeResult =
+                    self.rpc.call("estimatesmartfee", &[json!(target)])?;
+                Ok(est.feerate.unwrap_or_else(|| minrelayfee.clone()))
+            })
+            .collect::<Result<Vec<Value>, Error>>()?;
+
+        // prepend the estimate for 2 blocks as the estimate for 1 blocks
+        estimates.insert(0, estimates[0].clone());
+        // prepend the minrelayfee as the first item
+        estimates.insert(0, minrelayfee);
+
+        // the final format is: [ minrelayfee, est_for_2_blocks, est_for_2_blocks, est_for_3_blocks, ... ]
+        Ok(json!(estimates))
     }
 
     pub fn get_available_currencies(&self) -> Value {

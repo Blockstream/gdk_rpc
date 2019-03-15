@@ -31,6 +31,7 @@ pub struct GA_auth_handler {
 extern "C" {
     fn GA_get_networks(ret: *mut *const GA_json) -> i32;
     fn GA_get_available_currencies(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
     fn GA_convert_amount(
         sess: *const GA_session,
         details: *const GA_json,
@@ -162,6 +163,10 @@ fn main() {
         let mut units: *const GA_json = std::ptr::null_mut();
         assert_eq!(GA_OK, GA_convert_amount(sess, details, &mut units));
         debug!("converted units: {:?}\n", json_obj(units));
+
+        let mut estimates: *const GA_json = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_fee_estimates(sess, &mut estimates));
+        info!("fee estimates: {:?}\n", json_obj(estimates));
 
         let details = make_json(json!({ "page": 0 }));
         let mut txs: *const GA_json = std::ptr::null_mut();

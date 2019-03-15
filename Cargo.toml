@@ -10,6 +10,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 bitcoincore-rpc = { git = "https://github.com/rust-bitcoin/rust-bitcoincore-rpc", rev = "2d48109a7dd04b5b4a93abc776488d89e3862680" }
+bitcoincore-rpc-json = "0.2"
 bitcoin_hashes = { version = "0.3", features = [ "serde" ] }
 jsonrpc = "0.10"
 serde = "1.0"
