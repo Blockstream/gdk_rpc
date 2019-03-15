@@ -202,6 +202,10 @@ impl Wallet {
 
         Ok(self.rpc.send_raw_transaction(tx_hex)?)
     }
+
+    pub fn get_available_currencies(&self) -> Value {
+        json!({ "all": [ "USD" ], "per_exchange": { "BITSTAMP": [ "USD" ] } })
+    }
 }
 
 impl fmt::Debug for Wallet {

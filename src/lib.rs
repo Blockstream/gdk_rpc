@@ -380,7 +380,6 @@ pub extern "C" fn GA_send_transaction(
     GA_OK
 }
 
-
 //
 // Subaccounts
 //
@@ -472,6 +471,31 @@ pub extern "C" fn GA_destroy_auth_handler(auth_handler: *const GA_auth_handler) 
     // TODO make sure this works
     unsafe {
         drop(&*auth_handler);
+    }
+
+    GA_OK
+}
+
+//
+// Currency conversion
+//
+
+#[no_mangle]
+pub extern "C" fn GA_get_available_currencies(
+    sess: *const GA_session,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let currencies = wallet.get_available_currencies();
+
+    unsafe {
+        *ret = GA_json::ptr(currencies);
     }
 
     GA_OK

@@ -30,6 +30,7 @@ pub struct GA_auth_handler {
 #[link(name = "gdk_rpc")]
 extern "C" {
     fn GA_get_networks(ret: *mut *const GA_json) -> i32;
+    fn GA_get_available_currencies(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
 
     fn GA_create_session(ret: *mut *mut GA_session) -> i32;
     fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
@@ -132,6 +133,10 @@ fn main() {
             )
         );
         debug!("log in status: {:?}", get_status(auth_handler));
+
+        let mut currencies: *const GA_json = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_available_currencies(sess, &mut currencies));
+        debug!("currencies: {:?}\n", json_obj(currencies));
 
         let details = make_json(json!({ "page": 0 }));
         let mut txs: *const GA_json = std::ptr::null_mut();
