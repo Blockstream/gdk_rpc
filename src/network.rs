@@ -38,10 +38,6 @@ lazy_static! {
         );
         networks
     };
-    static ref CLIENTS: HashMap<String, Client> = NETWORKS
-        .iter()
-        .map(|(ref name, ref net)| (name.to_string(), net.connect()))
-        .collect();
 }
 
 impl Network {
@@ -51,10 +47,6 @@ impl Network {
 
     pub fn network(id: &String) -> Option<&'static Network> {
         NETWORKS.get(id)
-    }
-
-    pub fn client(id: &String) -> Option<&'static Client> {
-        CLIENTS.get(id)
     }
 
     pub fn connect(&self) -> Client {

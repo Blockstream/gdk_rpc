@@ -136,25 +136,26 @@ pub extern "C" fn GA_destroy_session(sess: *const GA_session) -> i32 {
 }
 
 #[no_mangle]
-pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32 {
+pub extern "C" fn GA_connect(
+    sess: *mut GA_session,
+    network_name: *const c_char,
+    log_level: u32,
+) -> i32 {
     let sess = unsafe { &mut *sess };
-    let network = read_str(network);
 
-    if Network::network(&network).is_none() {
-        // network does not exists
-        return GA_ERROR;
-    }
+    let network_name = read_str(network_name);
+    let network = match Network::network(&network_name) {
+        None => return GA_ERROR,
+        Some(network) => network,
+    };
 
-    let rpc = Network::client(&network).unwrap();
-    let wallet = Wallet::new(&rpc);
+    let wallet = Wallet::new(&network);
 
-    sess.network = Some(network);
+    sess.network = Some(network_name);
     sess.log_level = Some(log_level);
     sess.wallet = Some(wallet);
 
     println!("GA_connect() {:?}", sess);
-
-    println!("GA_connect() client: {:?}", rpc.get_blockchain_info());
     GA_OK
 }
 
@@ -162,6 +163,8 @@ pub extern "C" fn GA_connect(sess: *mut GA_session, network: *const c_char, log_
 pub extern "C" fn GA_disconnect(sess: *mut GA_session) -> i32 {
     let sess = unsafe { &mut *sess };
     sess.network = None;
+    // TODO cleanup rpc connection
+    sess.wallet = None;
     println!("GA_disconnect() {:?}", sess);
     GA_OK
 }
