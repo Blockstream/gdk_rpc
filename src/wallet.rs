@@ -68,18 +68,30 @@ impl Wallet {
     }
 
     pub fn get_account(&self) -> Result<Value, Error> {
+        let mut acct = json!({
+            "type": "core",
+            "pointer": 0,
+            "receiving_id": "",
+            "name": "RPC wallet",
+            "has_transactions": true, // TODO
+        });
+
+        // extend with data from get_balance()
+        // TODO avoid clone
+        let acct = acct.as_object_mut().req()?;
+        for (k, v) in self.get_balance()?.as_object().req()? {
+            acct.insert(k.to_string(), v.clone());
+        }
+        Ok(Value::Object(acct.clone()))
+    }
+
+    pub fn get_balance(&self) -> Result<Value, Error> {
         let balance: f64 = self.rpc.call("getbalance", &[])?;
         let balance = btc_to_sat(balance);
         let balance_f = balance as f64;
         let exchange_rate = 420.0; // TODO
 
         Ok(json!({
-            "type": "core",
-            "pointer": 0,
-            "receiving_id": "",
-            "name": "RPC wallet",
-            "has_transactions": true, // TODO
-
             "satoshi": balance.to_string(),
             "bits": (balance_f / SAT_PER_BIT).to_string(),
             "ubts": (balance_f / SAT_PER_BIT).to_string(),
