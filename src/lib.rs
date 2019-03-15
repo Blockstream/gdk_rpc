@@ -27,8 +27,8 @@ use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
 
-use network::Network;
-use wallet::Wallet;
+use crate::network::Network;
+use crate::wallet::Wallet;
 
 const GA_OK: i32 = 0;
 const GA_ERROR: i32 = -1;
