@@ -1,6 +1,11 @@
-image: blockstream/gdk_rpc@sha256:6b21a147e8099d78a9c368bdb297d979f9f93a209bc89b82ce27719c54f1a224
+image: blockstream/gdk_rpc@sha256:6c868aee4149f96f3ead2992ae09390be951050ab2fe35a650c6d8a9262403d1
 
 test_gdk_rpc_rust_c:
   script:
     - cd $CI_PROJECT_DIR
     - source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all --release && ./test.sh
+
+test_gdk_rpc_rust_c_ndk:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./ndk.sh

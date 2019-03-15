@@ -6,10 +6,10 @@ services:
 env:
   global:
     - DOCKERBUILDER=blockstream/gdk_rpc
-    - DOCKERHASH=6b21a147e8099d78a9c368bdb297d979f9f93a209bc89b82ce27719c54f1a224
+    - DOCKERHASH=6c868aee4149f96f3ead2992ae09390be951050ab2fe35a650c6d8a9262403d1
   matrix:
     - UNUSED=true
 
 
 script:
-  - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all --release && ./test.sh"
+  - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all --release && ./test.sh && ./ndk.sh"
