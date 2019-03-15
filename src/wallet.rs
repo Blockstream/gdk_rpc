@@ -149,6 +149,16 @@ impl Wallet {
         }))
     }
 
+    pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
+        let txid = Sha256dHash::from_hex(txid)?;
+        let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
+        let blockhash = txdesc
+            .get("blockhash")
+            .map(|b| Sha256dHash::from_hex(b.as_str().unwrap()).unwrap());
+        let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
+        format_gdk_tx(&txdesc, tx)
+    }
+
     pub fn create_transaction(&self, details: &Value) -> Result<Value, Error> {
         let addresses: &Vec<Value> = details.get("addresses").req()?.as_array().req()?;
 
@@ -228,16 +238,29 @@ fn btc_to_isat(amount: f64) -> i64 {
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
-    println!("tx: {:#?}", txdesc);
+    let amount = btc_to_isat(txdesc.get("amount").req()?.as_f64().req()?);
     let fee = txdesc
         .get("fee")
         .map_or(0, |f| btc_to_usat(f.as_f64().unwrap() * -1.0));
     let weight = tx.get_weight();
     let vsize = (weight as f32 / 4.0) as u32;
-    let type_str = match txdesc.get("category").req()?.as_str().req()? {
-        "send" => "outgoing",
-        "receive" => "incoming",
-        _ => bail!("invalid tx category"),
+
+    let type_str = match txdesc.get("category") {
+        // for listtransactions, read out the category field
+        Some(category) => match category.as_str().req()? {
+            "send" => "outgoing",
+            "receive" => "incoming",
+            _ => bail!("invalid tx category"),
+        },
+        // gettransaction doesn't have a top-level category,
+        // figure it out from the amount instead.
+        None => {
+            if amount > 0 {
+                "incoming"
+            } else {
+                "outgoing"
+            }
+        }
     };
 
     Ok(json!({
@@ -249,7 +272,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
 
-        "satoshi": btc_to_isat(txdesc.get("amount").req()?.as_f64().req()?),
+        "satoshi": amount,
 
         "transaction_version": tx.version,
         "transaction_locktime": tx.lock_time,

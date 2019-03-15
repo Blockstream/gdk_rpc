@@ -70,6 +70,12 @@ extern "C" {
         ret: *mut *const GA_json,
     ) -> i32;
 
+    fn GA_get_transaction_details(
+        sess: *mut GA_session,
+        txid: *const c_char,
+        ret: *mut *const GA_json,
+    ) -> i32;
+
     fn GA_create_transaction(
         sess: *const GA_session,
         details: *const GA_json,
@@ -187,7 +193,17 @@ fn main() {
             GA_OK,
             GA_send_transaction(sess, tx_detail_signed, &mut auth_handler)
         );
-        debug!("send_transaction status: {:#?}\n", get_status(auth_handler));
+        let status = get_status(auth_handler);
+        debug!("send_transaction status: {:#?}\n", status);
+
+        let txid = CString::new(status.get("result").unwrap().as_str().unwrap()).unwrap();
+
+        let mut loaded_tx: *const GA_json = std::ptr::null_mut();
+        assert_eq!(
+            GA_OK,
+            GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
+        );
+        info!("loaded broadcasted tx: {:#?}", json_obj(loaded_tx));
     }
 }
 

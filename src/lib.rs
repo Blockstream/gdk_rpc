@@ -244,7 +244,7 @@ pub extern "C" fn GA_get_transactions(
 
     let txs = match wallet.get_transactions(&details) {
         Err(err) => {
-            println!("Wallet::list_transactions() failed: {:?}", err);
+            println!("get_transations failed: {:?}", err);
             return GA_ERROR;
         }
         Ok(txs) => txs,
@@ -253,6 +253,33 @@ pub extern "C" fn GA_get_transactions(
     // XXX should we free details or should the client?
 
     unsafe { *ret = GA_json::ptr(json!(txs)) }
+
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_transaction_details(
+    sess: *const GA_session,
+    txid: *const c_char,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let txid = read_str(txid);
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let tx = match wallet.get_transaction(&txid) {
+        Err(err) => {
+            println!("get_transaction_details failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(tx) => tx,
+    };
+
+    unsafe { *ret = GA_json::ptr(tx) }
 
     GA_OK
 }
