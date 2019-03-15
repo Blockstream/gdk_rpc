@@ -294,7 +294,7 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
         None => return GA_ERROR,
     };
 
-    let account = match wallet.get_account() {
+    let account = match wallet.get_account(0) {
         Err(err) => {
             println!("get_account failed: {:?}", err);
             return GA_ERROR;
@@ -318,17 +318,12 @@ pub extern "C" fn GA_get_subaccount(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    if index != 0 {
-        println!("only a single subaccount is currently supported");
-        return GA_ERROR;
-    }
-
     let wallet = match sess.wallet {
         Some(ref wallet) => wallet,
         None => return GA_ERROR,
     };
 
-    let account = match wallet.get_account() {
+    let account = match wallet.get_account(index) {
         Err(err) => {
             println!("get_account failed: {:?}", err);
             return GA_ERROR;

@@ -67,7 +67,11 @@ impl Wallet {
         self.register(mnemonic)
     }
 
-    pub fn get_account(&self) -> Result<Value, Error> {
+    pub fn get_account(&self, subaccount: u32) -> Result<Value, Error> {
+        if subaccount != 0 {
+            bail!("multi-account is unsupported");
+        }
+
         let mut acct = json!({
             "type": "core",
             "pointer": 0,
