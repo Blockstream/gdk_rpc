@@ -12,4 +12,4 @@ env:
 
 
 script:
-  - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all && cargo test --all && ./test.sh"
+  - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all && ./test.sh"
