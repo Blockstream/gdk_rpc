@@ -34,7 +34,8 @@ use crate::wallet::Wallet;
 const GA_OK: i32 = 0;
 const GA_ERROR: i32 = -1;
 
-// TODO: return status
+const GA_TRUE: u32 = 1;
+const GA_FALSE: u32 = 0;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -486,6 +487,37 @@ pub extern "C" fn GA_get_subaccount(
 
     unsafe {
         *ret = GA_json::ptr(account);
+    }
+
+    GA_OK
+}
+
+//
+// Mnemonic
+//
+
+#[no_mangle]
+pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
+    let mnemonic = Wallet::generate_mnemonic();
+
+    unsafe {
+        *ret = make_str(mnemonic);
+    }
+
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -> i32 {
+    let mnemonic = read_str(mnemonic);
+    let is_valid = if Wallet::validate_mnemonic(mnemonic) {
+        GA_TRUE
+    } else {
+        GA_FALSE
+    };
+
+    unsafe {
+        *ret = is_valid;
     }
 
     GA_OK
@@ -959,11 +991,6 @@ pub extern "C" fn GA_twofactor_change_limits(
     _limit_details: *const GA_json,
     _ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_validate_mnemonic(_mnemonic: *const c_char, _ret: *mut *const u32) -> i32 {
     GA_ERROR
 }
 

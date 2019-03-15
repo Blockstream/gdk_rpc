@@ -2,7 +2,7 @@ use hex;
 use std::fmt;
 use std::str::FromStr;
 
-use bip39::{Language, Mnemonic, Seed};
+use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bitcoin::{consensus::serialize, Address, Network as BNetwork, PrivateKey, Transaction, TxOut};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
@@ -234,6 +234,17 @@ impl Wallet {
             "fiat_currency": currency,
             "fiat": (amount_f * exchange_rate).to_string(),
         })
+    }
+
+    pub fn generate_mnemonic() -> String {
+        Mnemonic::new(MnemonicType::Words24, Language::English).into_phrase()
+    }
+
+    pub fn validate_mnemonic(mnemonic: String) -> bool {
+        match Mnemonic::from_phrase(mnemonic, Language::English) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }
 

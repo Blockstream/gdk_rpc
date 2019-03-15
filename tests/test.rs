@@ -43,6 +43,9 @@ extern "C" {
     fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
     fn GA_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32;
 
+    fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32;
+    fn GA_validate_mnemonic(mnemonic: *const c_char, ret: &mut u32) -> i32;
+
     fn GA_get_receive_address(
         sess: *const GA_session,
         subaccount: u32,
@@ -214,6 +217,20 @@ fn main() {
             GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
         );
         info!("loaded broadcasted tx: {:#?}", json_obj(loaded_tx));
+
+        // mnemonic
+        let mut mnemonic: *const c_char = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_generate_mnemonic(&mut mnemonic));
+        let mnemonic = read_str(mnemonic);
+        info!("generated mnemonic: {}", mnemonic);
+
+        let mnemonic = CString::new(mnemonic).unwrap();
+        let mut is_valid = 0;
+        assert_eq!(
+            GA_OK,
+            GA_validate_mnemonic(mnemonic.as_ptr(), &mut is_valid)
+        );
+        info!("mnemonic is valid: {}", is_valid);
     }
 }
 
