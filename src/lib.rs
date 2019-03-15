@@ -381,6 +381,36 @@ pub extern "C" fn GA_send_transaction(
 }
 
 //
+// Addresses
+//
+
+#[no_mangle]
+pub extern "C" fn GA_get_receive_address(
+    sess: *const GA_session,
+    _subaccount: u32,
+    ret: *mut *const c_char,
+) -> i32 {
+    let sess = unsafe { &*sess };
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let address = match wallet.get_receive_address() {
+        Err(err) => {
+            println!("get_receive_address failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(address) => address,
+    };
+
+    unsafe { *ret = make_str(address) }
+
+    GA_OK
+}
+
+//
 // Subaccounts
 //
 

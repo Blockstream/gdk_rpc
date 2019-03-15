@@ -203,6 +203,10 @@ impl Wallet {
         Ok(self.rpc.send_raw_transaction(tx_hex)?)
     }
 
+    pub fn get_receive_address(&self) -> Result<String, Error> {
+        Ok(self.rpc.get_new_address(None, None)?)
+    }
+
     pub fn get_available_currencies(&self) -> Value {
         json!({ "all": [ "USD" ], "per_exchange": { "BITSTAMP": [ "USD" ] } })
     }

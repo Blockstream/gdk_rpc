@@ -38,6 +38,12 @@ extern "C" {
     fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
     fn GA_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32;
 
+    fn GA_get_receive_address(
+        sess: *const GA_session,
+        subaccount: u32,
+        ret: *mut *const c_char,
+    ) -> i32;
+
     fn GA_get_balance(
         sess: *const GA_session,
         details: *const GA_json,
@@ -152,6 +158,10 @@ fn main() {
         assert_eq!(GA_OK, GA_get_balance(sess, details, &mut balance));
         debug!("balance: {:#?}\n", json_obj(balance));
 
+        let mut recv_addr: *const c_char = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_receive_address(sess, 0, &mut recv_addr));
+        debug!("recv addr: {:#?}\n", read_str(recv_addr));
+
         let details = make_json(
             //json!({ "addresses": [ {"address":"bitcoin:2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b?amount=0.001"} ] }),
             json!({ "addresses": [ {"address":"2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b", "satoshi": 569000} ] }),
@@ -201,4 +211,8 @@ fn get_status(auth_handler: *const GA_auth_handler) -> Value {
     let mut status: *const GA_json = std::ptr::null_mut();
     unsafe { assert_eq!(GA_OK, GA_auth_handler_get_status(auth_handler, &mut status)) }
     json_obj(status)
+}
+
+fn read_str(s: *const c_char) -> String {
+    unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
