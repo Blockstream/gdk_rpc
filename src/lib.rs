@@ -545,6 +545,37 @@ pub extern "C" fn GA_get_available_currencies(
     GA_OK
 }
 
+#[no_mangle]
+pub extern "C" fn GA_convert_amount(
+    sess: *const GA_session,
+    value_details: *const GA_json,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let value_details = &unsafe { &*value_details }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let units = match wallet.convert_amount(&value_details) {
+        Err(err) => {
+            println!("convert_amount failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(units) => units,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(units);
+    }
+
+    GA_OK
+}
+
+// TODO: GA_get_fee_estimates, GA_generate_mnemonic
+
 //
 // JSON utilities
 //
@@ -655,9 +686,6 @@ pub extern "C" fn GA_destroy_string(ptr: *mut c_char) -> i32 {
     }
     GA_OK
 }
-
-// TODO: GA_get_transaction_details, GA_convert_amount,
-// GA_get_fee_estimates, GA_generate_mnemonic,
 
 //
 // Unimplemented, but gracefully degrades

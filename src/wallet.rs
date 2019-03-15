@@ -99,21 +99,8 @@ impl Wallet {
         let balance: f64 = self
             .rpc
             .call("getbalance", &[Value::Null, json!(min_conf)])?;
-        let balance = btc_to_usat(balance);
-        let balance_f = balance as f64;
-        let exchange_rate = 420.0; // TODO
 
-        Ok(json!({
-            "satoshi": balance.to_string(),
-            "bits": (balance_f / SAT_PER_BIT).to_string(),
-            "ubts": (balance_f / SAT_PER_BIT).to_string(),
-            "mbtc": (balance_f / SAT_PER_MBTC).to_string(),
-            "btc": (balance_f / SAT_PER_BTC).to_string(),
-
-            "fiat_rate": (exchange_rate).to_string(),
-            "fiat_currency": "USD", // TODO
-            "fiat": (balance_f * exchange_rate).to_string(),
-        }))
+        Ok(self._convert_amount(btc_to_usat(balance)))
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
@@ -219,6 +206,34 @@ impl Wallet {
 
     pub fn get_available_currencies(&self) -> Value {
         json!({ "all": [ "USD" ], "per_exchange": { "BITSTAMP": [ "USD" ] } })
+    }
+
+    pub fn exchange_rate(&self, _currency: &str) -> f64 {
+        // TODO
+        420.00
+    }
+
+    pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
+        let amount = details.get("satoshi").req()?.as_u64().req()?;
+        Ok(self._convert_amount(amount))
+    }
+
+    fn _convert_amount(&self, amount: u64) -> Value {
+        let currency = "USD"; // TODO
+        let exchange_rate = self.exchange_rate(currency);
+        let amount_f = amount as f64;
+
+        json!({
+            "satoshi": amount.to_string(),
+            "bits": (amount_f / SAT_PER_BIT).to_string(),
+            "ubtc": (amount_f / SAT_PER_BIT).to_string(),
+            "mbtc": (amount_f / SAT_PER_MBTC).to_string(),
+            "btc": (amount_f / SAT_PER_BTC).to_string(),
+
+            "fiat_rate": (exchange_rate).to_string(),
+            "fiat_currency": currency,
+            "fiat": (amount_f * exchange_rate).to_string(),
+        })
     }
 }
 
