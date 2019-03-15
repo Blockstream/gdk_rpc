@@ -67,7 +67,13 @@ impl Network {
 
 fn read_cookie() -> Result<(String, String), Error> {
     let path = env::var("BITCOIND_DIR").ok().map_or_else(
-        || env::home_dir().unwrap().join(".bitcoin").join("regtest").join(".cookie"),
+        || {
+            env::home_dir()
+                .unwrap()
+                .join(".bitcoin")
+                .join("regtest")
+                .join(".cookie")
+        },
         |p| Path::new(&p).join(".cookie"),
     );
     let contents = fs::read_to_string(path)?;
