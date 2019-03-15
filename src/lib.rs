@@ -49,16 +49,14 @@ impl GA_json {
 #[derive(Debug)]
 #[repr(C)]
 pub struct GA_session {
-    sid: u32,
     network: Option<String>,
     log_level: Option<u32>,
     wallet: Option<Wallet>,
 }
 
 impl GA_session {
-    fn ptr(sid: u32) -> *const GA_session {
+    fn ptr() -> *const GA_session {
         let sess = GA_session {
-            sid,
             network: None,
             log_level: None,
             wallet: None,
@@ -108,7 +106,7 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     println!("GA_create_session()");
     unsafe {
-        *ret = GA_session::ptr(1234);
+        *ret = GA_session::ptr();
     }
     GA_OK
 }
