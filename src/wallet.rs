@@ -12,6 +12,8 @@ use serde_json::Value;
 use crate::errors::OptionExt;
 
 const SAT_PER_BTC: f64 = 100_000_000.0;
+const SAT_PER_MBTC: f64 = 100_000.0;
+const SAT_PER_BIT: f64 = 100.0;
 const PER_PAGE: u32 = 10;
 
 pub struct Wallet {
@@ -63,6 +65,31 @@ impl Wallet {
     pub fn login(&self, mnemonic: &String) -> Result<(), Error> {
         // just as pass-through to register for now
         self.register(mnemonic)
+    }
+
+    pub fn get_account(&self) -> Result<Value, Error> {
+        let balance: f64 = self.rpc.call("getbalance", &[])?;
+        let balance = btc_to_sat(balance);
+        let balance_f = balance as f64;
+        let exchange_rate = 420.0; // TODO
+
+        Ok(json!({
+            "type": "core",
+            "pointer": 0,
+            "receiving_id": "",
+            "name": "RPC wallet",
+            "has_transactions": true, // TODO
+
+            "satoshi": balance.to_string(),
+            "bits": (balance_f / SAT_PER_BIT).to_string(),
+            "ubts": (balance_f / SAT_PER_BIT).to_string(),
+            "mbtc": (balance_f / SAT_PER_MBTC).to_string(),
+            "btc": (balance_f / SAT_PER_BTC).to_string(),
+
+            "fiat_rate": (exchange_rate).to_string(),
+            "fiat_currency": "USD", // TODO
+            "fiat": (balance_f * exchange_rate).to_string(),
+        }))
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {

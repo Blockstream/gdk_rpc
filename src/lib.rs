@@ -244,6 +244,45 @@ pub extern "C" fn GA_get_transactions(
 }
 
 //
+// Subaccounts
+//
+
+#[no_mangle]
+pub extern "C" fn GA_create_subaccount(
+    _sess: *const GA_session,
+    _details: *const GA_json,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    // unimplemented
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
+    let sess = unsafe { &*sess };
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let account = match wallet.get_account() {
+        Err(err) => {
+            println!("get_account failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(account) => account,
+    };
+
+    unsafe {
+        // always returns a list of a single account
+        *ret = GA_json::ptr(json!([account]));
+    }
+
+    GA_OK
+}
+
+//
 // JSON utilities
 //
 

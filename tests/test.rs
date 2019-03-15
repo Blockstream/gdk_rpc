@@ -30,8 +30,12 @@ pub struct GA_auth_handler {
 #[link(name = "gdk_rpc")]
 extern "C" {
     fn GA_get_networks(ret: *mut *const GA_json) -> i32;
+
     fn GA_create_session(ret: *mut *mut GA_session) -> i32;
     fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
+
+    fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+
     fn GA_register_user(
         sess: *mut GA_session,
         _hw_device: *const GA_json,
@@ -45,6 +49,7 @@ extern "C" {
         password: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
     ) -> i32;
+
     fn GA_get_transactions(
         sess: *mut GA_session,
         details: *const GA_json,
@@ -102,6 +107,10 @@ fn main() {
         let mut txs: *const GA_json = std::ptr::null_mut();
         assert_eq!(GA_OK, GA_get_transactions(sess, details, &mut txs));
         debug!("txs: {:#?}\n", json_obj(txs));
+
+        let mut subaccounts: *const GA_json = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_subaccounts(sess, &mut subaccounts));
+        debug!("subaccounts: {:#?}\n", json_obj(subaccounts));
     }
 }
 
