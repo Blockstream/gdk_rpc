@@ -325,18 +325,18 @@ pub extern "C" fn GA_create_transaction(
 #[no_mangle]
 pub extern "C" fn GA_sign_transaction(
     sess: *const GA_session,
-    details: *const GA_json,
+    tx_detail_unsigned: *const GA_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &*sess };
-    let details = &unsafe { &*details }.0;
+    let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
     let wallet = match sess.wallet {
         Some(ref wallet) => wallet,
         None => return GA_ERROR,
     };
 
-    let tx_detail_signed = match wallet.sign_transaction(&details) {
+    let tx_detail_signed = match wallet.sign_transaction(&tx_detail_unsigned) {
         Err(err) => {
             println!("sign_transaction failed: {:?}", err);
             return GA_ERROR;
@@ -350,6 +350,36 @@ pub extern "C" fn GA_sign_transaction(
 
     GA_OK
 }
+
+#[no_mangle]
+pub extern "C" fn GA_send_transaction(
+    sess: *const GA_session,
+    tx_detail_signed: *const GA_json,
+    ret: *mut *const GA_auth_handler,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let txid = match wallet.send_transaction(&tx_detail_signed) {
+        Err(err) => {
+            println!("send_transaction failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(txid) => txid,
+    };
+
+    unsafe {
+        *ret = GA_auth_handler::done(json!(txid));
+    }
+
+    GA_OK
+}
+
 
 //
 // Subaccounts

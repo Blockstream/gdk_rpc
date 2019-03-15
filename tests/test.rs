@@ -75,6 +75,12 @@ extern "C" {
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
+    fn GA_send_transaction(
+        sess: *const GA_session,
+        details: *const GA_json,
+        ret: *mut *const GA_auth_handler,
+    ) -> i32;
+
     fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
         -> i32;
     fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
@@ -157,7 +163,16 @@ fn main() {
             GA_OK,
             GA_sign_transaction(sess, tx_detail_unsigned, &mut auth_handler)
         );
-        debug!("sign_transaction status: {:#?}\n", get_status(auth_handler));
+        let sign_status = get_status(auth_handler);
+        debug!("sign_transaction status: {:#?}\n", sign_status);
+
+        let tx_detail_signed = make_json(sign_status.get("result").unwrap().clone());
+        let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+        assert_eq!(
+            GA_OK,
+            GA_send_transaction(sess, tx_detail_signed, &mut auth_handler)
+        );
+        debug!("send_transaction status: {:#?}\n", get_status(auth_handler));
     }
 }
 

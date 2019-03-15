@@ -195,6 +195,12 @@ impl Wallet {
         // might require some adjustments for GA apps compatibility
         Ok(signed_tx)
     }
+
+    pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
+        let tx_hex = details.get("hex").req()?.as_str().req()?;
+
+        Ok(self.rpc.send_raw_transaction(tx_hex)?)
+    }
 }
 
 impl fmt::Debug for Wallet {
