@@ -113,9 +113,6 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
     GA_OK
 }
 
-// GA_generate_mnemonic
-// GA_encrypt + GA_decrypt - mock
-
 //
 // Session & account management
 //
@@ -415,16 +412,6 @@ pub extern "C" fn GA_get_receive_address(
 //
 
 #[no_mangle]
-pub extern "C" fn GA_create_subaccount(
-    _sess: *const GA_session,
-    _details: *const GA_json,
-    _ret: *mut *const GA_auth_handler,
-) -> i32 {
-    // unimplemented
-    GA_ERROR
-}
-
-#[no_mangle]
 pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
@@ -646,4 +633,305 @@ pub extern "C" fn GA_destroy_string(ptr: *mut c_char) -> i32 {
         let _ = CString::from_raw(ptr);
     }
     GA_OK
+}
+
+// TODO: GA_get_transaction_details, GA_convert_amount,
+// GA_get_fee_estimates, GA_generate_mnemonic,
+
+//
+// Unimplemented, but gracefully degrades
+//
+
+#[no_mangle]
+pub extern "C" fn GA_get_system_message(_sess: *const GA_session, ret: *mut *const c_char) -> i32 {
+    // an empty string implies no system messages
+    unsafe {
+        *ret = make_str("".to_string());
+    }
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_ack_system_message(
+    _sess: *const GA_session,
+    _message_text: *const c_char,
+    ret: *mut *const GA_auth_handler,
+) -> i32 {
+    unsafe {
+        *ret = GA_auth_handler::success();
+    }
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_twofactor_config(
+    _sess: *const GA_session,
+    ret: *mut *const GA_json,
+) -> i32 {
+    // 2FA is always off
+    let res = json!({ "enabled": false });
+    unsafe {
+        *ret = GA_json::ptr(res);
+    }
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_set_notification_handler(
+    _sess: *const GA_session,
+    _handler: *const libc::c_void,
+    _context: *const libc::c_void,
+) -> i32 {
+    // we don't actually register or notify, just report success back
+    GA_OK
+}
+
+//
+// Unimplemented and GA_ERROR's
+//
+
+#[no_mangle]
+pub extern "C" fn GA_connect_with_proxy(
+    _sess: *const GA_session,
+    _network: *const c_char,
+    _proxy_uri: *const c_char,
+    _use_tor: u32,
+    _log_level: u32,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_reconnect_hint(_sess: *const GA_session, _hint: *const GA_json) -> i32 {
+    // TODO can we just GA_OK and ignore it?
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_login_with_pin(
+    _sess: *mut GA_session,
+    _pin: *const c_char,
+    _pin_data: *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_set_watch_only(
+    _sess: *mut GA_session,
+    _username: *const c_char,
+    _password: *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_watch_only_username(
+    _sess: *mut GA_session,
+    _ret: *mut *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_login_watch_only(
+    _sess: *mut GA_session,
+    _username: *const c_char,
+    _password: *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_remove_account(
+    _sess: *mut GA_session,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_create_subaccount(
+    _sess: *const GA_session,
+    _details: *const GA_json,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_unspent_outputs(
+    _sess: *const GA_session,
+    _details: *const GA_json,
+    _ret: *mut *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_unspent_outputs_for_private_key(
+    _sess: *const GA_session,
+    _private_key: *const c_char,
+    _password: *const c_char,
+    _unused: u32,
+    _ret: *mut *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_set_pin(
+    _sess: *const GA_session,
+    _mnemonic: *const c_char,
+    _pin: *const c_char,
+    _device_id: *const c_char,
+    _ret: *mut *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_broadcast_transaction(
+    _sess: *const GA_session,
+    _tx_hex: *const c_char,
+    _ret: *mut *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_send_nlocktimes(_sess: *const GA_session) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_set_transaction_memo(
+    _sess: *const GA_session,
+    _txid: *const c_char,
+    _memo: *const c_char,
+    _memo_type: u32,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_mnemonic_passphrase(
+    _sess: *const GA_session,
+    _password: *const c_char,
+    _ret: *mut *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_encrypt(
+    _sess: *const GA_session,
+    _data: *const GA_json,
+    _ret: *mut *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_decrypt(
+    _sess: *const GA_session,
+    _data: *const GA_json,
+    _ret: *mut *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_change_settings(
+    _sess: *const GA_session,
+    _settings: *const GA_json,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_settings(_sess: *const GA_session, _ret: *mut *const GA_json) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_auth_handler_request_code(
+    _auth_handler: *const GA_auth_handler,
+    _method: *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_auth_handler_resolve_code(
+    _auth_handler: *const GA_auth_handler,
+    _code: *const c_char,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_auth_handler_call(_auth_handler: *const GA_auth_handler) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_change_settings_twofactor(
+    _sess: *const GA_session,
+    _method: *const c_char,
+    _twofactor_details: *const GA_json,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_twofactor_reset(
+    _sess: *const GA_session,
+    _email: *const c_char,
+    _is_dispute: u32,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_twofactor_cancel_reset(
+    _sess: *const GA_session,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_twofactor_change_limits(
+    _sess: *const GA_session,
+    _limit_details: *const GA_json,
+    _ret: *mut *const GA_auth_handler,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_validate_mnemonic(_mnemonic: *const c_char, _ret: *mut *const u32) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_register_network(
+    _name: *const c_char,
+    _network_details: *const GA_json,
+) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_uniform_uint32_t(_upper_bound: u32, _ret: *mut *const u32) -> i32 {
+    GA_ERROR
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_random_bytes(_num_bytes: u32, _ret: *mut *const c_char, _len: u32) -> i32 {
+    GA_ERROR
 }
