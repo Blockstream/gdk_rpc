@@ -20,3 +20,17 @@ Get [rust](https://rustup.rs)
 cd in the repo
 
 cargo build
+
+## Building for Android
+
+Download ndk r19b
+
+export ANDROID_NDK=location_of_unzipped_ndk_r19b
+
+You will also need to run (one off)
+
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+then to build for the various target run
+
+./ndk.sh
