@@ -63,6 +63,12 @@ extern "C" {
         ret: *mut *const GA_json,
     ) -> i32;
 
+    fn GA_create_transaction(
+        sess: *const GA_session,
+        details: *const GA_json,
+        ret: *mut *const GA_json,
+    ) -> i32;
+
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 }
@@ -123,6 +129,17 @@ fn main() {
         let mut balance: *const GA_json = std::ptr::null_mut();
         assert_eq!(GA_OK, GA_get_balance(sess, details, &mut balance));
         debug!("balance: {:#?}\n", json_obj(balance));
+
+        let details = make_json(
+            //json!({ "addresses": [ {"address":"bitcoin:2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b?amount=0.001"} ] }),
+            json!({ "addresses": [ {"address":"2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b", "satoshi": 569000} ] }),
+        );
+        let mut tx_detail_unsigned: *const GA_json = std::ptr::null_mut();
+        assert_eq!(
+            GA_OK,
+            GA_create_transaction(sess, details, &mut tx_detail_unsigned)
+        );
+        debug!("create_transaction: {:#?}\n", json_obj(tx_detail_unsigned));
     }
 }
 

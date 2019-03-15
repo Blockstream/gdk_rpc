@@ -272,6 +272,39 @@ pub extern "C" fn GA_get_balance(
 }
 
 //
+// Creating transactions
+//
+
+#[no_mangle]
+pub extern "C" fn GA_create_transaction(
+    sess: *const GA_session,
+    details: *const GA_json,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let details = &unsafe { &*details }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let tx_detail_unsigned = match wallet.create_transaction(&details) {
+        Err(err) => {
+            println!("create_transaction failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(t) => t,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(tx_detail_unsigned);
+    }
+
+    GA_OK
+}
+
+//
 // Subaccounts
 //
 

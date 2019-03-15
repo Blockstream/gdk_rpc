@@ -1,8 +1,9 @@
 use hex;
 use std::fmt;
+use std::str::FromStr;
 
 use bip39::{Language, Mnemonic, Seed};
-use bitcoin::{consensus::serialize, Network as BNetwork, PrivateKey, Transaction};
+use bitcoin::{consensus::serialize, Address, Network as BNetwork, PrivateKey, Transaction, TxOut};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
@@ -95,7 +96,9 @@ impl Wallet {
     }
 
     fn _get_balance(&self, min_conf: u32) -> Result<Value, Error> {
-        let balance: f64 = self.rpc.call("getbalance", &[ Value::Null, json!(min_conf)])?;
+        let balance: f64 = self
+            .rpc
+            .call("getbalance", &[Value::Null, json!(min_conf)])?;
         let balance = btc_to_sat(balance);
         let balance_f = balance as f64;
         let exchange_rate = 420.0; // TODO
@@ -144,6 +147,36 @@ impl Wallet {
             "next_page_id": if potentially_has_more { Some(page+1) } else { None },
         }))
     }
+
+    pub fn create_transaction(&self, details: &Value) -> Result<Value, Error> {
+        let addresses: &Vec<Value> = details.get("addresses").req()?.as_array().req()?;
+
+        let tx = Transaction {
+            version: 2,
+            lock_time: 0,
+            input: vec![],
+            output: addresses
+                .iter()
+                .map(make_output)
+                .collect::<Result<Vec<TxOut>, Error>>()?,
+        };
+
+        // TODO explicit handling for id_no_utxos_found id_no_recipients id_insufficient_funds
+        // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
+        // id_send_all_requires_a_single_output
+
+        let funded_tx: Value = self
+            .rpc
+            .call("fundrawtransaction", &[json!(hex::encode(serialize(&tx)))])?;
+
+        // make sure "hex" is available, fail otherwise
+        funded_tx.get("hex").req()?;
+
+        // XXX reusing bitcoind's format for now (an object with "hex", "fee" and "changepos"),
+        // might require some adjustments for GA apps compatibility
+        Ok(funded_tx)
+    }
+
 }
 
 impl fmt::Debug for Wallet {
@@ -199,4 +232,17 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         //"inputs": tx.input.iter().map(format_gdk_input).collect(),
         //"outputs": tx.output.iter().map(format_gdk_output).collect(),
     }))
+}
+
+fn make_output(desc: &Value) -> Result<TxOut, Error> {
+    let dest = desc.get("address").req()?.as_str().req()?.to_string();
+    let value = desc.get("satoshi").req()?.as_u64().req()?;
+
+    // TODO: dest could also be a BIP 21 URI with amount
+    let address = Address::from_str(&dest)?;
+
+    Ok(TxOut {
+        value,
+        script_pubkey: address.script_pubkey(),
+    })
 }
