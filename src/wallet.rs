@@ -79,14 +79,19 @@ impl Wallet {
         // extend with data from get_balance()
         // TODO avoid clone
         let acct = acct.as_object_mut().req()?;
-        for (k, v) in self.get_balance()?.as_object().req()? {
+        for (k, v) in self._get_balance(0)?.as_object().req()? {
             acct.insert(k.to_string(), v.clone());
         }
         Ok(Value::Object(acct.clone()))
     }
 
-    pub fn get_balance(&self) -> Result<Value, Error> {
-        let balance: f64 = self.rpc.call("getbalance", &[])?;
+    pub fn get_balance(&self, details: &Value) -> Result<Value, Error> {
+        let min_conf = details.get("num_confs").req()?.as_u64().req()? as u32;
+        self._get_balance(min_conf)
+    }
+
+    fn _get_balance(&self, min_conf: u32) -> Result<Value, Error> {
+        let balance: f64 = self.rpc.call("getbalance", &[ Value::Null, json!(min_conf)])?;
         let balance = btc_to_sat(balance);
         let balance_f = balance as f64;
         let exchange_rate = 420.0; // TODO

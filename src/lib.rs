@@ -242,6 +242,35 @@ pub extern "C" fn GA_get_transactions(
     GA_OK
 }
 
+#[no_mangle]
+pub extern "C" fn GA_get_balance(
+    sess: *const GA_session,
+    details: *const GA_json,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let details = &unsafe { &*details }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let balance = match wallet.get_balance(&details) {
+        Err(err) => {
+            println!("get_balance failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(balance) => balance,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(balance);
+    }
+
+    GA_OK
+}
+
 //
 // Subaccounts
 //

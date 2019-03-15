@@ -35,6 +35,13 @@ extern "C" {
     fn GA_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
 
     fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GA_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32;
+
+    fn GA_get_balance(
+        sess: *const GA_session,
+        details: *const GA_json,
+        ret: *mut *const GA_json,
+    ) -> i32;
 
     fn GA_register_user(
         sess: *mut GA_session,
@@ -111,6 +118,11 @@ fn main() {
         let mut subaccounts: *const GA_json = std::ptr::null_mut();
         assert_eq!(GA_OK, GA_get_subaccounts(sess, &mut subaccounts));
         debug!("subaccounts: {:#?}\n", json_obj(subaccounts));
+
+        let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
+        let mut balance: *const GA_json = std::ptr::null_mut();
+        assert_eq!(GA_OK, GA_get_balance(sess, details, &mut balance));
+        debug!("balance: {:#?}\n", json_obj(balance));
     }
 }
 
