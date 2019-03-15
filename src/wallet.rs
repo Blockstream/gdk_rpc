@@ -165,7 +165,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
         "created_at": txdesc.get("time").req()?.as_u64().req()?, // TODO to UTC string
         "type": type_str,
-        "memo": txdesc.get("label").ok_or(""),
+        "memo": txdesc.get("label").map_or("".to_string(), |l| l.as_str().unwrap().to_string()),
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
