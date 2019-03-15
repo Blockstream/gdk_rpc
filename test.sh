@@ -7,6 +7,6 @@ set -eo pipefail
 
 cargo test --all
 
-gcc -o test test.c -Isrc  -L. -l:target/debug/libgdk_rpc.so && ./test
+gcc -o test test.c -Isrc  -L. -l:target/release/libgdk_rpc.so && ./test
 
 /bitcoin/bin/bitcoin-cli -regtest stop
