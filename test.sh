@@ -1,7 +1,7 @@
 #!/bin/bash
+set -eo pipefail
 
 /bitcoin/bin/bitcoind -server=1 -regtest -daemon
-
 
 cargo test --all
 
