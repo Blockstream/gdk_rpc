@@ -72,8 +72,12 @@ extern "C" {
     fn GA_sign_transaction(
         sess: *const GA_session,
         details: *const GA_json,
-        ret: *mut *const GA_json,
+        ret: *mut *const GA_auth_handler,
     ) -> i32;
+
+    fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
+        -> i32;
+    fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
 
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
@@ -107,8 +111,9 @@ fn main() {
             GA_OK,
             GA_register_user(sess, hw_device, mnemonic.as_ptr(), &mut auth_handler)
         );
-        debug!("registered");
+        debug!("register status: {:?}", get_status(auth_handler));
 
+        let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
         let password = CString::new("").unwrap();
         assert_eq!(
             GA_OK,
@@ -120,7 +125,7 @@ fn main() {
                 &mut auth_handler,
             )
         );
-        debug!("logged in");
+        debug!("log in status: {:?}", get_status(auth_handler));
 
         let details = make_json(json!({ "page": 0 }));
         let mut txs: *const GA_json = std::ptr::null_mut();
@@ -147,12 +152,12 @@ fn main() {
         );
         debug!("create_transaction: {:#?}\n", json_obj(tx_detail_unsigned));
 
-        let mut tx_detail_signed: *const GA_json = std::ptr::null_mut();
+        let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
         assert_eq!(
             GA_OK,
-            GA_sign_transaction(sess, tx_detail_unsigned, &mut tx_detail_signed)
+            GA_sign_transaction(sess, tx_detail_unsigned, &mut auth_handler)
         );
-        debug!("sign_transaction: {:#?}\n", json_obj(tx_detail_signed));
+        debug!("sign_transaction status: {:#?}\n", get_status(auth_handler));
     }
 }
 
@@ -170,4 +175,10 @@ fn make_json(val: Value) -> *const GA_json {
         assert_eq!(GA_OK, GA_convert_string_to_json(cstr.as_ptr(), &mut json));
     }
     json
+}
+
+fn get_status(auth_handler: *const GA_auth_handler) -> Value {
+    let mut status: *const GA_json = std::ptr::null_mut();
+    unsafe { assert_eq!(GA_OK, GA_auth_handler_get_status(auth_handler, &mut status)) }
+    json_obj(status)
 }

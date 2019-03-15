@@ -67,11 +67,29 @@ impl GA_session {
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct GA_auth_handler(u32);
+pub enum GA_auth_handler {
+    Error(String),
+    Done(Value),
+}
+
 impl GA_auth_handler {
-    fn ptr(method: u32) -> *const GA_auth_handler {
-        let handler = GA_auth_handler(method);
+    fn error(err: String) -> *const GA_auth_handler {
+        let handler = GA_auth_handler::Error(err);
         unsafe { transmute(Box::new(handler)) }
+    }
+    fn done(res: Value) -> *const GA_auth_handler {
+        let handler = GA_auth_handler::Done(res);
+        unsafe { transmute(Box::new(handler)) }
+    }
+    fn success() -> *const GA_auth_handler {
+        GA_auth_handler::done(Value::Null)
+    }
+
+    fn to_json(&self) -> Value {
+        match self {
+            GA_auth_handler::Error(err) => json!({ "status": "error", "error": err }),
+            GA_auth_handler::Done(res) => json!({ "status": "done", "result": res }),
+        }
     }
 }
 
@@ -155,7 +173,7 @@ pub extern "C" fn GA_register_user(
     sess: *mut GA_session,
     _hw_device: *const GA_json,
     mnemonic: *const c_char,
-    auth_handler: *mut *const GA_auth_handler,
+    ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
     let wallet = sess.wallet.as_ref().unwrap();
@@ -171,7 +189,7 @@ pub extern "C" fn GA_register_user(
     }
 
     unsafe {
-        *auth_handler = GA_auth_handler::ptr(0);
+        *ret = GA_auth_handler::success();
     }
 
     GA_OK
@@ -183,7 +201,7 @@ pub extern "C" fn GA_login(
     _hw_device: *const GA_json,
     mnemonic: *const c_char,
     password: *const c_char,
-    auth_handler: *mut *const GA_auth_handler,
+    ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
     let wallet = sess.wallet.as_ref().unwrap();
@@ -202,7 +220,7 @@ pub extern "C" fn GA_login(
     }
 
     unsafe {
-        *auth_handler = GA_auth_handler::ptr(0);
+        *ret = GA_auth_handler::success();
     }
 
     println!("GA_login({}) {:?}", mnemonic, sess);
@@ -308,7 +326,7 @@ pub extern "C" fn GA_create_transaction(
 pub extern "C" fn GA_sign_transaction(
     sess: *const GA_session,
     details: *const GA_json,
-    ret: *mut *const GA_json,
+    ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
@@ -327,7 +345,7 @@ pub extern "C" fn GA_sign_transaction(
     };
 
     unsafe {
-        *ret = GA_json::ptr(tx_detail_signed);
+        *ret = GA_auth_handler::done(tx_detail_signed);
     }
 
     GA_OK
@@ -395,6 +413,35 @@ pub extern "C" fn GA_get_subaccount(
 
     unsafe {
         *ret = GA_json::ptr(account);
+    }
+
+    GA_OK
+}
+
+//
+// Auth handler
+//
+
+#[no_mangle]
+pub extern "C" fn GA_auth_handler_get_status(
+    auth_handler: *const GA_auth_handler,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let auth_handler = unsafe { &*auth_handler };
+    let status = auth_handler.to_json();
+
+    unsafe {
+        *ret = GA_json::ptr(status);
+    }
+
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GA_destroy_auth_handler(auth_handler: *const GA_auth_handler) -> i32 {
+    // TODO make sure this works
+    unsafe {
+        drop(&*auth_handler);
     }
 
     GA_OK
