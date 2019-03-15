@@ -99,7 +99,7 @@ impl Wallet {
         let balance: f64 = self
             .rpc
             .call("getbalance", &[Value::Null, json!(min_conf)])?;
-        let balance = btc_to_sat(balance);
+        let balance = btc_to_usat(balance);
         let balance_f = balance as f64;
         let exchange_rate = 420.0; // TODO
 
@@ -218,8 +218,12 @@ impl fmt::Debug for Wallet {
     }
 }
 
-fn btc_to_sat(amount: f64) -> u64 {
+fn btc_to_usat(amount: f64) -> u64 {
     (amount * SAT_PER_BTC) as u64
+}
+
+fn btc_to_isat(amount: f64) -> i64 {
+    (amount * SAT_PER_BTC) as i64
 }
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
@@ -227,7 +231,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     println!("tx: {:#?}", txdesc);
     let fee = txdesc
         .get("fee")
-        .map_or(0, |f| btc_to_sat(f.as_f64().unwrap() * -1.0));
+        .map_or(0, |f| btc_to_usat(f.as_f64().unwrap() * -1.0));
     let weight = tx.get_weight();
     let vsize = (weight as f32 / 4.0) as u32;
     let type_str = match txdesc.get("category").req()?.as_str().req()? {
@@ -244,6 +248,8 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
+
+        "satoshi": btc_to_isat(txdesc.get("amount").req()?.as_f64().req()?),
 
         "transaction_version": tx.version,
         "transaction_locktime": tx.lock_time,
