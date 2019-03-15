@@ -553,7 +553,6 @@ pub extern "C" fn GA_get_available_currencies(
 pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32 {
     let json = &unsafe { &*json }.0;
     let res = json.to_string();
-    println!("GA_convert_json {:?} => {:?}", json, res);
     unsafe {
         *ret = make_str(res);
     }
@@ -564,7 +563,6 @@ pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *con
 pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
     let jstr = read_str(jstr);
     let json = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
-    println!("GA_convert_string {:?} => {:?}", jstr, json);
     unsafe {
         *ret = GA_json::ptr(json);
     }
@@ -580,7 +578,6 @@ pub extern "C" fn GA_convert_json_value_to_string(
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json.get(&path).expect("path missing").to_string();
-    println!("GA_convert_json_value_to_string {:?} => {:?}", path, res);
     unsafe {
         *ret = make_str(res);
     }
@@ -600,7 +597,6 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
         .expect("path missing")
         .as_u64()
         .expect("invalid number") as u32;
-    println!("GA_convert_json_value_to_uint32 {:?} => {:?}", path, res);
     unsafe {
         *ret = res;
     }
@@ -620,7 +616,6 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
         .expect("path missing")
         .as_u64()
         .expect("invalid number");
-    println!("GA_convert_json_value_to_uint64 {:?} => {:?}", path, res);
     unsafe {
         *ret = res;
     }
@@ -637,7 +632,6 @@ pub extern "C" fn GA_convert_json_value_to_json(
     let path = read_str(path);
     let jstr = json.get(&path).expect("path missing").to_string();
     let res = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
-    println!("GA_convert_json_value_to_json {:?} => {:?}", path, res);
     unsafe {
         *ret = GA_json::ptr(res);
     }
