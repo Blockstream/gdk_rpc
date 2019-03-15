@@ -111,9 +111,11 @@ fn btc_to_sat(amount: f64) -> u64 {
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
     println!("tx: {:#?}", txdesc);
-    let fee = txdesc.get("fee").map_or(0, |f| btc_to_sat(f.as_f64().unwrap() * -1.0));
+    let fee = txdesc
+        .get("fee")
+        .map_or(0, |f| btc_to_sat(f.as_f64().unwrap() * -1.0));
     let weight = tx.get_weight();
-    let vsize = (weight as f32/4.0) as u32;
+    let vsize = (weight as f32 / 4.0) as u32;
     let type_str = match txdesc.get("category").req()?.as_str().req()? {
         "send" => "outgoing",
         "receive" => "incoming",
