@@ -8,7 +8,9 @@ export CC_x86_64_linux_android=x86_64-linux-android21-clang
 export CC_armv7_linux_androideabi=armv7a-linux-androideabi19-clang
 export CC_aarch64_linux_android=aarch64-linux-android21-clang
 
-source /root/.cargo/env
+if [ -f /.dockerenv ]; then
+    source /root/.cargo/env
+fi
 
 cp cargo-config.toml ~/.cargo/config
 
