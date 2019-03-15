@@ -282,6 +282,35 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
     GA_OK
 }
 
+#[no_mangle]
+pub extern "C" fn GA_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32 {
+    let sess = unsafe { &*sess };
+
+    if index != 0 {
+        println!("only a single subaccount is currently supported");
+        return GA_ERROR;
+    }
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let account = match wallet.get_account() {
+        Err(err) => {
+            println!("get_account failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(account) => account,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(account);
+    }
+
+    GA_OK
+}
+
 //
 // JSON utilities
 //
