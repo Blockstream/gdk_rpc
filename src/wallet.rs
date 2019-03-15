@@ -133,9 +133,10 @@ impl Wallet {
             .filter(|txdesc| txdesc.get("category").unwrap().as_str().unwrap() != "immature")
             .map(|txdesc| {
                 let txid = Sha256dHash::from_hex(txdesc.get("txid").unwrap().as_str().unwrap())?;
-                let blockhash =
-                    Sha256dHash::from_hex(txdesc.get("blockhash").unwrap().as_str().unwrap())?;
-                let tx = self.rpc.get_raw_transaction(&txid, Some(&blockhash))?;
+                let blockhash = txdesc
+                    .get("blockhash")
+                    .map(|b| Sha256dHash::from_hex(b.as_str().unwrap()).unwrap());
+                let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
 
                 format_gdk_tx(txdesc, tx)
             })
