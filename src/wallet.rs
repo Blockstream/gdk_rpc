@@ -177,6 +177,22 @@ impl Wallet {
         Ok(funded_tx)
     }
 
+    pub fn sign_transaction(&self, details: &Value) -> Result<Value, Error> {
+        let tx_hex = details.get("hex").req()?.as_str().req()?.to_string();
+
+        let signed_tx: Value = self.rpc.call("signrawtransactionwithwallet", &[json!(tx_hex)])?;
+
+        if signed_tx.get("complete").req()?.as_bool().req()? == false {
+            let errors = signed_tx
+                .get("errors")
+                .map_or("".to_string(), |errors| errors.to_string());
+            bail!("the transaction cannot be signed: {}", errors)
+        }
+
+        // XXX reusing bitcoind's format for now (an object with "hex", "fee" and "changepos"),
+        // might require some adjustments for GA apps compatibility
+        Ok(signed_tx)
+    }
 }
 
 impl fmt::Debug for Wallet {

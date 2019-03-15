@@ -69,6 +69,12 @@ extern "C" {
         ret: *mut *const GA_json,
     ) -> i32;
 
+    fn GA_sign_transaction(
+        sess: *const GA_session,
+        details: *const GA_json,
+        ret: *mut *const GA_json,
+    ) -> i32;
+
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 }
@@ -140,6 +146,13 @@ fn main() {
             GA_create_transaction(sess, details, &mut tx_detail_unsigned)
         );
         debug!("create_transaction: {:#?}\n", json_obj(tx_detail_unsigned));
+
+        let mut tx_detail_signed: *const GA_json = std::ptr::null_mut();
+        assert_eq!(
+            GA_OK,
+            GA_sign_transaction(sess, tx_detail_unsigned, &mut tx_detail_signed)
+        );
+        debug!("sign_transaction: {:#?}\n", json_obj(tx_detail_signed));
     }
 }
 

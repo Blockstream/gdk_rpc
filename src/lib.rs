@@ -304,6 +304,35 @@ pub extern "C" fn GA_create_transaction(
     GA_OK
 }
 
+#[no_mangle]
+pub extern "C" fn GA_sign_transaction(
+    sess: *const GA_session,
+    details: *const GA_json,
+    ret: *mut *const GA_json,
+) -> i32 {
+    let sess = unsafe { &*sess };
+    let details = &unsafe { &*details }.0;
+
+    let wallet = match sess.wallet {
+        Some(ref wallet) => wallet,
+        None => return GA_ERROR,
+    };
+
+    let tx_detail_signed = match wallet.sign_transaction(&details) {
+        Err(err) => {
+            println!("sign_transaction failed: {:?}", err);
+            return GA_ERROR;
+        }
+        Ok(t) => t,
+    };
+
+    unsafe {
+        *ret = GA_json::ptr(tx_detail_signed);
+    }
+
+    GA_OK
+}
+
 //
 // Subaccounts
 //
