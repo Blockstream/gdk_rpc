@@ -45,7 +45,7 @@ const GA_FALSE: u32 = 0;
 pub struct GA_json(Value);
 
 impl GA_json {
-    fn ptr(data: Value) -> *const GA_json {
+    fn new(data: Value) -> *const GA_json {
         unsafe { transmute(Box::new(GA_json(data))) }
     }
 }
@@ -63,7 +63,7 @@ pub struct GA_session {
 }
 
 impl GA_session {
-    fn ptr() -> *const GA_session {
+    fn new() -> *const GA_session {
         let sess = GA_session {
             network: None,
             log_level: None,
@@ -80,7 +80,7 @@ impl GA_session {
     fn push(&self, data: Value) {
         debug!("push notification: {:?}", data);
         if let Some((handler, context)) = self.push {
-            handler(context, GA_json::ptr(data));
+            handler(context, GA_json::new(data));
         }
     }
 }
@@ -148,7 +148,7 @@ macro_rules! ret_ptr {
 
 macro_rules! ret_json {
     ($t:expr, $x:expr) => {
-        ret_ptr!($t, GA_json::ptr(json!($x)));
+        ret_ptr!($t, GA_json::new(json!($x)));
     };
 }
 
@@ -168,7 +168,7 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     debug!("GA_create_session()");
-    ret_ptr!(ret, GA_session::ptr())
+    ret_ptr!(ret, GA_session::new())
 }
 
 #[no_mangle]
