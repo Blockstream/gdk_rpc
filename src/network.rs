@@ -12,10 +12,30 @@ use crate::errors::OptionExt;
 pub struct Network {
     name: String,
     network: String,
+
     rpc_url: String,
     rpc_cred: Option<(String, String)>, // (username, password)
     rpc_cookie: Option<String>,
+
+    bech32_prefix: String,
+    p2pkh_version: u32,
+    p2sh_version: u32,
+
+    development: bool,
+    liquid: bool,
+    mainnet: bool,
+
     tx_explorer_url: String,
+    address_explorer_url: String,
+
+    // unimplemented
+    default_peers: Vec<String>,
+    service_chain_code: String,
+    service_pubkey: String,
+    wamp_onion_url: String,
+    wamp_url: String,
+    wamp_cert_pins: Vec<String>,
+    wamp_cert_roots: Vec<String>,
 }
 
 lazy_static! {
@@ -50,6 +70,23 @@ lazy_static! {
                 rpc_cred: None,
                 rpc_cookie: Some(rpc_cookie.to_string()),
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
+                address_explorer_url: "https://blockstream.info/address/".to_string(),
+
+                bech32_prefix: "bcrt".to_string(),
+                p2pkh_version: 111,
+                p2sh_version: 196,
+
+                development: true, // TODO
+                liquid: false,
+                mainnet: false,
+
+                default_peers: vec![],
+                service_chain_code: "".to_string(),
+                service_pubkey: "".to_string(),
+                wamp_onion_url: "".to_string(),
+                wamp_url: "".to_string(),
+                wamp_cert_pins: vec![],
+                wamp_cert_roots: vec![],
             },
         );
 
@@ -62,6 +99,24 @@ lazy_static! {
                 rpc_cred: Some(("satoshi".to_string(), "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string())),
                 rpc_cookie: None,
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
+                address_explorer_url: "https://blockstream.info/address/".to_string(),
+
+                bech32_prefix: "tb".to_string(),
+                p2pkh_version: 111,
+                p2sh_version: 196,
+
+                development: true, // TODO
+                liquid: false,
+                mainnet: false,
+
+                default_peers: vec![],
+                service_chain_code: "".to_string(),
+                service_pubkey: "".to_string(),
+                wamp_onion_url: "".to_string(),
+                wamp_url: "".to_string(),
+                wamp_cert_pins: vec![],
+                wamp_cert_roots: vec![],
+
             },
         );
 
