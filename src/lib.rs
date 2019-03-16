@@ -24,7 +24,6 @@ pub mod errors;
 pub mod network;
 pub mod wallet;
 
-use failure::ResultExt;
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
@@ -118,7 +117,11 @@ fn read_str(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
 
-macro_rules! tryret {
+//
+// Macros
+//
+
+macro_rules! try_ret {
     ($x:expr) => {
         match $x {
             Err(err) => {
@@ -130,16 +133,28 @@ macro_rules! tryret {
     };
 }
 
+macro_rules! ret_ptr {
+    ($t:expr, $x:expr) => {
+        unsafe {
+            *$t = $x;
+            return GA_OK;
+        };
+    };
+}
+
+macro_rules! ret_json {
+    ($t:expr, $x:expr) => {
+        ret_ptr!($t, GA_json::ptr(json!($x)));
+    };
+}
+
 //
 // Networks
 //
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
-    unsafe {
-        *ret = GA_json::ptr(json!(Network::networks()));
-    }
-    GA_OK
+    ret_json!(ret, Network::networks())
 }
 
 //
@@ -149,10 +164,7 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     debug!("GA_create_session()");
-    unsafe {
-        *ret = GA_session::ptr();
-    }
-    GA_OK
+    ret_ptr!(ret, GA_session::ptr())
 }
 
 #[no_mangle]
@@ -172,8 +184,8 @@ pub extern "C" fn GA_connect(
     let sess = unsafe { &mut *sess };
 
     let network_name = read_str(network_name);
-    let network = tryret!(Network::network(&network_name).or_err("missing network"));
-    let rpc = tryret!(network.connect());
+    let network = try_ret!(Network::network(&network_name).or_err("missing network"));
+    let rpc = try_ret!(network.connect());
     let wallet = Wallet::new(rpc);
 
     sess.network = Some(network_name);
@@ -202,20 +214,16 @@ pub extern "C" fn GA_register_user(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    tryret!(wallet.register(&mnemonic));
+    try_ret!(wallet.register(&mnemonic));
 
-    unsafe {
-        *ret = GA_auth_handler::success();
-    }
-
-    GA_OK
+    ret_ptr!(ret, GA_auth_handler::success());
 }
 
 #[no_mangle]
@@ -227,7 +235,7 @@ pub extern "C" fn GA_login(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
@@ -237,14 +245,11 @@ pub extern "C" fn GA_login(
         return GA_ERROR;
     }
 
-    tryret!(wallet.login(&mnemonic));
-
-    unsafe {
-        *ret = GA_auth_handler::success();
-    }
-
     debug!("GA_login({}) {:?}", mnemonic, sess);
-    GA_OK
+
+    try_ret!(wallet.login(&mnemonic));
+
+    ret_ptr!(ret, GA_auth_handler::success());
 }
 
 //
@@ -260,15 +265,13 @@ pub extern "C" fn GA_get_transactions(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let txs = tryret!(wallet.get_transactions(&details));
+    let txs = try_ret!(wallet.get_transactions(&details));
 
     // XXX should we free details or should the client?
 
-    unsafe { *ret = GA_json::ptr(json!(txs)) }
-
-    GA_OK
+    ret_json!(ret, txs)
 }
 
 #[no_mangle]
@@ -280,13 +283,11 @@ pub extern "C" fn GA_get_transaction_details(
     let sess = unsafe { &*sess };
     let txid = read_str(txid);
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx = tryret!(wallet.get_transaction(&txid));
+    let tx = try_ret!(wallet.get_transaction(&txid));
 
-    unsafe { *ret = GA_json::ptr(tx) }
-
-    GA_OK
+    ret_json!(ret, tx)
 }
 
 #[no_mangle]
@@ -298,15 +299,11 @@ pub extern "C" fn GA_get_balance(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let balance = tryret!(wallet.get_balance(&details));
+    let balance = try_ret!(wallet.get_balance(&details));
 
-    unsafe {
-        *ret = GA_json::ptr(balance);
-    }
-
-    GA_OK
+    ret_json!(ret, balance)
 }
 
 //
@@ -322,15 +319,11 @@ pub extern "C" fn GA_create_transaction(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx_detail_unsigned = tryret!(wallet.create_transaction(&details));
+    let tx_detail_unsigned = try_ret!(wallet.create_transaction(&details));
 
-    unsafe {
-        *ret = GA_json::ptr(tx_detail_unsigned);
-    }
-
-    GA_OK
+    ret_json!(ret, tx_detail_unsigned)
 }
 
 #[no_mangle]
@@ -342,15 +335,11 @@ pub extern "C" fn GA_sign_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx_detail_signed = tryret!(wallet.sign_transaction(&tx_detail_unsigned));
+    let tx_detail_signed = try_ret!(wallet.sign_transaction(&tx_detail_unsigned));
 
-    unsafe {
-        *ret = GA_auth_handler::done(tx_detail_signed);
-    }
-
-    GA_OK
+    ret_ptr!(ret, GA_auth_handler::done(tx_detail_signed));
 }
 
 #[no_mangle]
@@ -362,15 +351,11 @@ pub extern "C" fn GA_send_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let txid = tryret!(wallet.send_transaction(&tx_detail_signed));
+    let txid = try_ret!(wallet.send_transaction(&tx_detail_signed));
 
-    unsafe {
-        *ret = GA_auth_handler::done(json!(txid));
-    }
-
-    GA_OK
+    ret_ptr!(ret, GA_auth_handler::done(json!(txid)));
 }
 
 //
@@ -385,13 +370,11 @@ pub extern "C" fn GA_get_receive_address(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let address = tryret!(wallet.get_receive_address());
+    let address = try_ret!(wallet.get_receive_address());
 
-    unsafe { *ret = make_str(address) }
-
-    GA_OK
+    ret_ptr!(ret, make_str(address))
 }
 
 //
@@ -402,16 +385,12 @@ pub extern "C" fn GA_get_receive_address(
 pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let account = tryret!(wallet.get_account(0));
+    let account = try_ret!(wallet.get_account(0));
 
-    unsafe {
-        // always returns a list of a single account
-        *ret = GA_json::ptr(json!([account]));
-    }
-
-    GA_OK
+    // always returns a list of a single account
+    ret_json!(ret, [account])
 }
 
 #[no_mangle]
@@ -422,15 +401,11 @@ pub extern "C" fn GA_get_subaccount(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let account = tryret!(wallet.get_account(index));
+    let account = try_ret!(wallet.get_account(index));
 
-    unsafe {
-        *ret = GA_json::ptr(account);
-    }
-
-    GA_OK
+    ret_json!(ret, account)
 }
 
 //
@@ -441,11 +416,7 @@ pub extern "C" fn GA_get_subaccount(
 pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
     let mnemonic = Wallet::generate_mnemonic();
 
-    unsafe {
-        *ret = make_str(mnemonic);
-    }
-
-    GA_OK
+    ret_ptr!(ret, make_str(mnemonic))
 }
 
 #[no_mangle]
@@ -457,11 +428,7 @@ pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -
         GA_FALSE
     };
 
-    unsafe {
-        *ret = is_valid;
-    }
-
-    GA_OK
+    ret_ptr!(ret, is_valid)
 }
 
 //
@@ -476,11 +443,7 @@ pub extern "C" fn GA_auth_handler_get_status(
     let auth_handler = unsafe { &*auth_handler };
     let status = auth_handler.to_json();
 
-    unsafe {
-        *ret = GA_json::ptr(status);
-    }
-
-    GA_OK
+    ret_json!(ret, status)
 }
 
 #[no_mangle]
@@ -504,15 +467,11 @@ pub extern "C" fn GA_get_available_currencies(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let currencies = wallet.get_available_currencies();
 
-    unsafe {
-        *ret = GA_json::ptr(currencies);
-    }
-
-    GA_OK
+    ret_json!(ret, currencies)
 }
 
 #[no_mangle]
@@ -524,29 +483,21 @@ pub extern "C" fn GA_convert_amount(
     let sess = unsafe { &*sess };
     let value_details = &unsafe { &*value_details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let units = tryret!(wallet.convert_amount(&value_details));
+    let units = try_ret!(wallet.convert_amount(&value_details));
 
-    unsafe {
-        *ret = GA_json::ptr(units);
-    }
-
-    GA_OK
+    ret_json!(ret, units)
 }
 #[no_mangle]
 pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
+    let wallet = try_ret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let estimates = tryret!(wallet.get_fee_estimates());
+    let estimates = try_ret!(wallet.get_fee_estimates());
 
-    unsafe {
-        *ret = GA_json::ptr(estimates);
-    }
-
-    GA_OK
+    ret_json!(ret, estimates)
 }
 
 //
@@ -573,20 +524,14 @@ pub extern "C" fn GA_set_notification_handler(
 pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32 {
     let json = &unsafe { &*json }.0;
     let res = json.to_string();
-    unsafe {
-        *ret = make_str(res);
-    }
-    GA_OK
+    ret_ptr!(ret, make_str(res))
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
     let jstr = read_str(jstr);
-    let json = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
-    unsafe {
-        *ret = GA_json::ptr(json);
-    }
-    GA_OK
+    let json: Value = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
+    ret_json!(ret, json)
 }
 
 #[no_mangle]
@@ -598,10 +543,7 @@ pub extern "C" fn GA_convert_json_value_to_string(
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json.get(&path).expect("path missing").to_string();
-    unsafe {
-        *ret = make_str(res);
-    }
-    GA_OK
+    ret_ptr!(ret, make_str(res))
 }
 
 #[no_mangle]
@@ -617,10 +559,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
         .expect("path missing")
         .as_u64()
         .expect("invalid number") as u32;
-    unsafe {
-        *ret = res;
-    }
-    GA_OK
+    ret_ptr!(ret, res)
 }
 
 #[no_mangle]
@@ -636,10 +575,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
         .expect("path missing")
         .as_u64()
         .expect("invalid number");
-    unsafe {
-        *ret = res;
-    }
-    GA_OK
+    ret_ptr!(ret, res)
 }
 
 #[no_mangle]
@@ -651,11 +587,8 @@ pub extern "C" fn GA_convert_json_value_to_json(
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let jstr = json.get(&path).expect("path missing").to_string();
-    let res = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
-    unsafe {
-        *ret = GA_json::ptr(res);
-    }
-    GA_OK
+    let res: Value = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
+    ret_json!(ret, res)
 }
 
 #[no_mangle]
@@ -683,10 +616,7 @@ pub extern "C" fn GA_destroy_string(ptr: *mut c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_get_system_message(_sess: *const GA_session, ret: *mut *const c_char) -> i32 {
     // an empty string implies no system messages
-    unsafe {
-        *ret = make_str("".to_string());
-    }
-    GA_OK
+    ret_ptr!(ret, make_str("".to_string()))
 }
 
 #[no_mangle]
@@ -695,10 +625,7 @@ pub extern "C" fn GA_ack_system_message(
     _message_text: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    unsafe {
-        *ret = GA_auth_handler::success();
-    }
-    GA_OK
+    ret_ptr!(ret, GA_auth_handler::success())
 }
 
 #[no_mangle]
@@ -707,11 +634,7 @@ pub extern "C" fn GA_get_twofactor_config(
     ret: *mut *const GA_json,
 ) -> i32 {
     // 2FA is always off
-    let res = json!({ "enabled": false });
-    unsafe {
-        *ret = GA_json::ptr(res);
-    }
-    GA_OK
+    ret_json!(ret, json!({ "enabled": false }))
 }
 
 //
