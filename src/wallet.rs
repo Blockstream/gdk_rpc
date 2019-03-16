@@ -365,6 +365,6 @@ fn make_output(desc: &Value) -> Result<TxOut, Error> {
     })
 }
 
-fn fmt_time(unix_ts: u32) -> String {
+fn fmt_time(unix_ts: u64) -> String {
     NaiveDateTime::from_timestamp(unix_ts as i64, 0).to_string()
 }
