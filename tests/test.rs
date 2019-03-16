@@ -119,8 +119,9 @@ extern "C" {
 
 #[test]
 fn main() {
-    //stderrlog::new().module(module_path!()).init().unwrap();
     stderrlog::new().verbosity(3).init().unwrap();
+
+    // TODO free up resources
 
     unsafe {
         let mut nets: *const GA_json = std::ptr::null_mut();

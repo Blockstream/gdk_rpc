@@ -256,7 +256,7 @@ impl Wallet {
         json!({
             "satoshi": amount.to_string(),
             "bits": (amount_f / SAT_PER_BIT).to_string(),
-            "ubtc": (amount_f / SAT_PER_BIT).to_string(),
+            "ubtc": (amount_f / SAT_PER_BIT).to_string(), // XXX why twice? same as bits
             "mbtc": (amount_f / SAT_PER_MBTC).to_string(),
             "btc": (amount_f / SAT_PER_BTC).to_string(),
 
