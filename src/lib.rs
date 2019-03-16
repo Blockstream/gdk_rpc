@@ -141,8 +141,8 @@ macro_rules! ret_ptr {
     ($t:expr, $x:expr) => {
         unsafe {
             *$t = $x;
-            return GA_OK;
-        };
+            GA_OK
+        }
     };
 }
 
@@ -227,7 +227,7 @@ pub extern "C" fn GA_register_user(
 
     try_ret!(wallet.register(&mnemonic));
 
-    ret_ptr!(ret, GA_auth_handler::success());
+    ret_ptr!(ret, GA_auth_handler::success())
 }
 
 #[no_mangle]
@@ -253,7 +253,7 @@ pub extern "C" fn GA_login(
 
     try_ret!(wallet.login(&mnemonic));
 
-    ret_ptr!(ret, GA_auth_handler::success());
+    ret_ptr!(ret, GA_auth_handler::success())
 }
 
 //
@@ -343,7 +343,7 @@ pub extern "C" fn GA_sign_transaction(
 
     let tx_detail_signed = try_ret!(wallet.sign_transaction(&tx_detail_unsigned));
 
-    ret_ptr!(ret, GA_auth_handler::done(tx_detail_signed));
+    ret_ptr!(ret, GA_auth_handler::done(tx_detail_signed))
 }
 
 #[no_mangle]
@@ -359,7 +359,7 @@ pub extern "C" fn GA_send_transaction(
 
     let txid = try_ret!(wallet.send_transaction(&tx_detail_signed));
 
-    ret_ptr!(ret, GA_auth_handler::done(json!(txid)));
+    ret_ptr!(ret, GA_auth_handler::done(json!(txid)))
 }
 
 //
