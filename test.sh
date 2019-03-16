@@ -5,7 +5,7 @@ set -eo pipefail
 
 /bitcoin/bin/bitcoin-cli -regtest -rpcwait generate 102
 
-cargo test --all
+cargo test --all  -- --test-threads=1
 
 gcc -o test test.c -Isrc  -L. -l:target/release/libgdk_rpc.so && ./test
 
