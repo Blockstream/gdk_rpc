@@ -3,6 +3,7 @@
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
+extern crate chrono;
 extern crate dirs;
 extern crate jsonrpc;
 extern crate libc;
@@ -153,7 +154,7 @@ pub extern "C" fn GA_connect(
         Err(err) => {
             println!("failed connect: {:?}", err);
             return GA_ERROR;
-        },
+        }
         Ok(wallet) => wallet,
     };
 

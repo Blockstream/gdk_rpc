@@ -25,6 +25,7 @@ log = "0.4"
 stderrlog = "0.4"
 hex = "0.3"
 dirs = "1.0"
+chrono = "0.4"
 
 [dependencies.secp256k1]
 version = "0.12"

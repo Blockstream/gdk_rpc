@@ -8,6 +8,7 @@ use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
+use chrono::NaiveDateTime;
 use failure::Error;
 use serde_json::Value;
 
@@ -320,7 +321,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
     Ok(json!({
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
-        "created_at": txdesc.get("time").req()?.as_u64().req()?, // TODO to UTC string
+        "created_at": fmt_time(txdesc.get("time").req()?.as_u64().req()?),
         "type": type_str,
         "memo": txdesc.get("label").map_or("".to_string(), |l| l.as_str().unwrap().to_string()),
 
@@ -362,4 +363,8 @@ fn make_output(desc: &Value) -> Result<TxOut, Error> {
         value,
         script_pubkey: address.script_pubkey(),
     })
+}
+
+fn fmt_time(unix_ts: u32) -> String {
+    NaiveDateTime::from_timestamp(unix_ts as i64, 0).to_string()
 }
