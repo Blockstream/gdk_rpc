@@ -171,8 +171,8 @@ pub extern "C" fn GA_connect(
 
     let network_name = read_str(network_name);
     let network = tryret!(Network::network(&network_name).or_err("missing network"));
-
-    let wallet = tryret!(Wallet::new(&network).context("opening wallet failed"));
+    let rpc = tryret!(network.connect().context("rpc connection failed"));
+    let wallet = Wallet::new(rpc);
 
     sess.network = Some(network_name);
     sess.log_level = Some(log_level);

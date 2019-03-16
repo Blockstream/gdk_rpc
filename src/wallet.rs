@@ -13,7 +13,6 @@ use failure::Error;
 use serde_json::Value;
 
 use crate::errors::OptionExt;
-use crate::network::Network;
 
 const SAT_PER_BTC: f64 = 100_000_000.0;
 const SAT_PER_MBTC: f64 = 100_000.0;
@@ -25,10 +24,8 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(network: &Network) -> Result<Self, Error> {
-        Ok(Wallet {
-            rpc: network.connect()?,
-        })
+    pub fn new(rpc: RpcClient) -> Self {
+        Wallet { rpc }
     }
 
     pub fn register(&self, mnemonic: &String) -> Result<(), Error> {
