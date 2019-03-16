@@ -57,11 +57,11 @@ lazy_static! {
 }
 
 impl Network {
-    pub fn networks() -> &'static HashMap<String, Network> {
+    pub fn list() -> &'static HashMap<String, Network> {
         &NETWORKS
     }
 
-    pub fn network(id: &String) -> Option<&'static Network> {
+    pub fn get(id: &String) -> Option<&'static Network> {
         NETWORKS.get(id)
     }
 

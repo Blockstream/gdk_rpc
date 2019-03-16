@@ -25,10 +25,6 @@ pub struct GA_session {
     _private: [u8; 0],
 }
 
-struct GA_session_ptr(*mut GA_session);
-
-unsafe impl Sync for GA_session_ptr {}
-
 #[repr(C)]
 pub struct GA_auth_handler {
     _private: [u8; 0],
@@ -124,10 +120,13 @@ extern "C" {
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 }
 
+struct GA_session_ptr(*mut GA_session);
+unsafe impl Sync for GA_session_ptr {}
+
 lazy_static! {
     static ref SESS: GA_session_ptr = {
         let mut sess: *mut GA_session = std::ptr::null_mut();
-        unsafe { assert_eq!(GA_OK, GA_create_session(&mut sess)) };
+        assert_eq!(GA_OK, unsafe { GA_create_session(&mut sess) });
         GA_session_ptr(sess)
     };
 }
@@ -141,14 +140,14 @@ fn a0_setup() {
 
 #[test]
 fn a1_test_create_session() {
-    // the first access to SESS creates is
+    // the first access to SESS creates it
     debug!("created session: {:?}", SESS.0)
 }
 
 #[test]
 fn a2_test_connect() {
     let network = CString::new("regtest").unwrap();
-    unsafe { assert_eq!(GA_OK, GA_connect(SESS.0, network.as_ptr(), 5)) };
+    assert_eq!(GA_OK, unsafe { GA_connect(SESS.0, network.as_ptr(), 5) });
     debug!("connected");
 }
 
@@ -160,12 +159,9 @@ fn a3_test_account() {
     )
     .unwrap();
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-    unsafe {
-        assert_eq!(
-            GA_OK,
-            GA_register_user(SESS.0, hw_device, mnemonic.as_ptr(), &mut auth_handler)
-        )
-    };
+    assert_eq!(GA_OK, unsafe {
+        GA_register_user(SESS.0, hw_device, mnemonic.as_ptr(), &mut auth_handler)
+    });
     debug!("register status: {:?}", get_status(auth_handler));
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
@@ -188,14 +184,14 @@ fn a4_test_currencies() {
     assert_eq!(GA_OK, unsafe {
         GA_get_available_currencies(SESS.0, &mut currencies)
     });
-    debug!("currencies: {:?}\n", json_obj(currencies));
+    debug!("currencies: {:?}\n", read_json(currencies));
 
     let details = make_json(json!({ "satoshi": 1234567 }));
     let mut units: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GA_convert_amount(SESS.0, details, &mut units)
     });
-    debug!("converted units: {:?}\n", json_obj(units));
+    debug!("converted units: {:?}\n", read_json(units));
 }
 
 #[test]
@@ -204,7 +200,7 @@ fn a4_test_estimates() {
     assert_eq!(GA_OK, unsafe {
         GA_get_fee_estimates(SESS.0, &mut estimates)
     });
-    info!("fee estimates: {:?}\n", json_obj(estimates));
+    info!("fee estimates: {:?}\n", read_json(estimates));
 }
 
 #[test]
@@ -213,7 +209,7 @@ fn a4_test_account() {
     assert_eq!(GA_OK, unsafe {
         GA_get_subaccounts(SESS.0, &mut subaccounts)
     });
-    debug!("subaccounts: {:#?}\n", json_obj(subaccounts));
+    debug!("subaccounts: {:#?}\n", read_json(subaccounts));
 }
 
 #[test]
@@ -223,7 +219,7 @@ fn a4_test_transactions() {
     assert_eq!(GA_OK, unsafe {
         GA_get_transactions(SESS.0, details, &mut txs)
     });
-    debug!("txs: {:#?}\n", json_obj(txs));
+    debug!("txs: {:#?}\n", read_json(txs));
 }
 
 #[test]
@@ -233,7 +229,7 @@ fn a4_test_balance() {
     assert_eq!(GA_OK, unsafe {
         GA_get_balance(SESS.0, details, &mut balance)
     });
-    debug!("balance: {:#?}\n", json_obj(balance));
+    debug!("balance: {:#?}\n", read_json(balance));
 }
 
 #[test]
@@ -255,7 +251,7 @@ fn a4_send_tx() {
     assert_eq!(GA_OK, unsafe {
         GA_create_transaction(SESS.0, details, &mut tx_detail_unsigned)
     });
-    debug!("create_transaction: {:#?}\n", json_obj(tx_detail_unsigned));
+    debug!("create_transaction: {:#?}\n", read_json(tx_detail_unsigned));
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
@@ -278,22 +274,20 @@ fn a4_send_tx() {
     assert_eq!(GA_OK, unsafe {
         GA_get_transaction_details(SESS.0, txid.as_ptr(), &mut loaded_tx)
     });
-    info!("loaded broadcasted tx: {:#?}", json_obj(loaded_tx));
+    info!("loaded broadcasted tx: {:#?}", read_json(loaded_tx));
 }
 
 #[test]
 fn test_networks() {
     let mut nets: *const GA_json = std::ptr::null_mut();
-    unsafe {
-        assert_eq!(GA_OK, GA_get_networks(&mut nets));
-    }
-    debug!("networks: {:?}\n", json_obj(nets));
+    assert_eq!(GA_OK, unsafe { GA_get_networks(&mut nets) });
+    debug!("networks: {:?}\n", read_json(nets));
 }
 
 #[test]
 fn test_mnemonic() {
     let mut mnemonic: *const c_char = std::ptr::null_mut();
-    unsafe { assert_eq!(GA_OK, GA_generate_mnemonic(&mut mnemonic)) };
+    assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic) });
     let mnemonic = read_str(mnemonic);
     info!("generated mnemonic: {}", mnemonic);
 
@@ -317,14 +311,14 @@ fn a4_test_notifications() {
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
     info!(
         "notification handler called: {:?} -- {:?}",
-        json_obj(ctx),
-        json_obj(data)
+        read_json(ctx),
+        read_json(data)
     );
 }
 
-fn json_obj(json: *const GA_json) -> Value {
+fn read_json(json: *const GA_json) -> Value {
     let mut s: *const c_char = std::ptr::null_mut();
-    unsafe { assert_eq!(GA_OK, GA_convert_json_to_string(json, &mut s)) };
+    assert_eq!(GA_OK, unsafe { GA_convert_json_to_string(json, &mut s) });
     let s = unsafe { CStr::from_ptr(s) }.to_str().unwrap();
     serde_json::from_str(&s).unwrap()
 }
@@ -332,16 +326,18 @@ fn json_obj(json: *const GA_json) -> Value {
 fn make_json(val: Value) -> *const GA_json {
     let cstr = CString::new(val.to_string()).unwrap();
     let mut json: *const GA_json = std::ptr::null_mut();
-    unsafe {
-        assert_eq!(GA_OK, GA_convert_string_to_json(cstr.as_ptr(), &mut json));
-    }
+    assert_eq!(GA_OK, unsafe {
+        GA_convert_string_to_json(cstr.as_ptr(), &mut json)
+    });
     json
 }
 
 fn get_status(auth_handler: *const GA_auth_handler) -> Value {
     let mut status: *const GA_json = std::ptr::null_mut();
-    unsafe { assert_eq!(GA_OK, GA_auth_handler_get_status(auth_handler, &mut status)) }
-    json_obj(status)
+    assert_eq!(GA_OK, unsafe {
+        GA_auth_handler_get_status(auth_handler, &mut status)
+    });
+    read_json(status)
 }
 
 fn read_str(s: *const c_char) -> String {

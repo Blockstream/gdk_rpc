@@ -56,7 +56,7 @@ pub struct GA_session {
     network: Option<String>,
     log_level: Option<u32>,
     wallet: Option<Wallet>,
-    push: Option<(
+    notify: Option<(
         extern "C" fn(*const libc::c_void, *const GA_json),
         *const libc::c_void,
     )>,
@@ -68,7 +68,7 @@ impl GA_session {
             network: None,
             log_level: None,
             wallet: None,
-            push: None,
+            notify: None,
         };
         unsafe { transmute(Box::new(sess)) }
     }
@@ -77,10 +77,12 @@ impl GA_session {
         self.wallet.as_ref()
     }
 
-    fn push(&self, data: Value) {
+    fn notify(&self, data: Value) {
         debug!("push notification: {:?}", data);
-        if let Some((handler, context)) = self.push {
+        if let Some((handler, context)) = self.notify {
             handler(context, GA_json::new(data));
+        } else {
+            warn!("no registered handler to receive notification");
         }
     }
 }
@@ -158,7 +160,7 @@ macro_rules! ret_json {
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
-    ret_json!(ret, Network::networks())
+    ret_json!(ret, Network::list())
 }
 
 //
@@ -186,14 +188,15 @@ pub extern "C" fn GA_connect(
     log_level: u32,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-
     let network_name = read_str(network_name);
-    let network = try_ret!(Network::network(&network_name).or_err("missing network"));
+
+    let network = try_ret!(Network::get(&network_name).or_err("missing network"));
     let rpc = try_ret!(network.connect());
     let wallet = Wallet::new(rpc);
 
     sess.network = Some(network_name);
-    sess.log_level = Some(log_level);
+    //sess.log_level = Some(log_level);
+    //stderrlog::new().verbosity(3).init().unwrap();
     sess.wallet = Some(wallet);
 
     debug!("GA_connect() {:?}", sess);
@@ -217,14 +220,13 @@ pub extern "C" fn GA_register_user(
     mnemonic: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
+    println!("GA_register_user1()");
     let sess = unsafe { &mut *sess };
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
-    // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
+    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
     try_ret!(wallet.register(&mnemonic));
 
     ret_ptr!(ret, GA_auth_handler::success())
@@ -239,9 +241,6 @@ pub extern "C" fn GA_login(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
-    // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
 
     if read_str(password).len() > 0 {
@@ -251,6 +250,7 @@ pub extern "C" fn GA_login(
 
     debug!("GA_login({}) {:?}", mnemonic, sess);
 
+    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
     try_ret!(wallet.login(&mnemonic));
 
     ret_ptr!(ret, GA_auth_handler::success())
@@ -270,7 +270,6 @@ pub extern "C" fn GA_get_transactions(
     let details = &unsafe { &*details }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let txs = try_ret!(wallet.get_transactions(&details));
 
     // XXX should we free details or should the client?
@@ -288,7 +287,6 @@ pub extern "C" fn GA_get_transaction_details(
     let txid = read_str(txid);
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let tx = try_ret!(wallet.get_transaction(&txid));
 
     ret_json!(ret, tx)
@@ -304,7 +302,6 @@ pub extern "C" fn GA_get_balance(
     let details = &unsafe { &*details }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let balance = try_ret!(wallet.get_balance(&details));
 
     ret_json!(ret, balance)
@@ -324,7 +321,6 @@ pub extern "C" fn GA_create_transaction(
     let details = &unsafe { &*details }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let tx_detail_unsigned = try_ret!(wallet.create_transaction(&details));
 
     ret_json!(ret, tx_detail_unsigned)
@@ -340,7 +336,6 @@ pub extern "C" fn GA_sign_transaction(
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let tx_detail_signed = try_ret!(wallet.sign_transaction(&tx_detail_unsigned));
 
     ret_ptr!(ret, GA_auth_handler::done(tx_detail_signed))
@@ -356,7 +351,6 @@ pub extern "C" fn GA_send_transaction(
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let txid = try_ret!(wallet.send_transaction(&tx_detail_signed));
 
     ret_ptr!(ret, GA_auth_handler::done(json!(txid)))
@@ -375,7 +369,6 @@ pub extern "C" fn GA_get_receive_address(
     let sess = unsafe { &*sess };
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let address = try_ret!(wallet.get_receive_address());
 
     ret_ptr!(ret, make_str(address))
@@ -390,7 +383,6 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
     let sess = unsafe { &*sess };
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let account = try_ret!(wallet.get_account(0));
 
     // always returns a list of a single account
@@ -406,7 +398,6 @@ pub extern "C" fn GA_get_subaccount(
     let sess = unsafe { &*sess };
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let account = try_ret!(wallet.get_account(index));
 
     ret_json!(ret, account)
@@ -472,7 +463,6 @@ pub extern "C" fn GA_get_available_currencies(
     let sess = unsafe { &*sess };
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let currencies = wallet.get_available_currencies();
 
     ret_json!(ret, currencies)
@@ -488,7 +478,6 @@ pub extern "C" fn GA_convert_amount(
     let value_details = &unsafe { &*value_details }.0;
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let units = try_ret!(wallet.convert_amount(&value_details));
 
     ret_json!(ret, units)
@@ -498,7 +487,6 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     let sess = unsafe { &*sess };
 
     let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-
     let estimates = try_ret!(wallet.get_fee_estimates());
 
     ret_json!(ret, estimates)
@@ -515,8 +503,8 @@ pub extern "C" fn GA_set_notification_handler(
     context: *const libc::c_void,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    sess.push = Some((handler, context));
-    sess.push(json!({ "init": "hello world" }));
+    sess.notify = Some((handler, context));
+    sess.notify(json!({ "init": "hello world" }));
     GA_OK
 }
 
