@@ -144,6 +144,14 @@ fn a0_setup() {
 }
 
 #[test]
+fn a0_test_notifications() {
+    let ctx = make_json(json!({ "test": "my ctx" }));
+    assert_eq!(GA_OK, unsafe {
+        GA_set_notification_handler(SESS.0, notification_handler, ctx)
+    });
+}
+
+#[test]
 fn a1_test_create_session() {
     // the first access to SESS creates it
     debug!("created session: {:?}", SESS.0)
@@ -283,14 +291,20 @@ fn a4_send_tx() {
 }
 
 #[test]
-fn test_networks() {
+fn a5_test_destroy_session() {
+    debug!("destroying session");
+    assert_eq!(GA_OK, unsafe { GA_destroy_session(SESS.0) })
+}
+
+#[test]
+fn a6_test_networks() {
     let mut nets: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_networks(&mut nets) });
     debug!("networks: {:?}\n", read_json(nets));
 }
 
 #[test]
-fn test_mnemonic() {
+fn a6_test_mnemonic() {
     let mut mnemonic: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic) });
     let mnemonic = read_str(mnemonic);
@@ -303,14 +317,6 @@ fn test_mnemonic() {
     });
     info!("mnemonic is valid: {}", is_valid);
     assert_eq!(GA_TRUE, is_valid);
-}
-
-#[test]
-fn a4_test_notifications() {
-    let ctx = make_json(json!({ "test": "my ctx" }));
-    assert_eq!(GA_OK, unsafe {
-        GA_set_notification_handler(SESS.0, notification_handler, ctx)
-    });
 }
 
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {

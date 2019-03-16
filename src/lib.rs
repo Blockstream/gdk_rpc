@@ -32,9 +32,14 @@ use failure::Error;
 use log::LevelFilter;
 use serde_json::Value;
 
+use std::collections::HashSet;
 use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
@@ -102,6 +107,60 @@ impl GA_session {
             self.notify(json!({ "event": "network", "network": { "connected": true } }));
             self.notify(json!({ "event": "fees", "fees": wallet.get_fee_estimates()? }));
             self.notify(json!({ "event": "block", "block": wallet.get_tip()? }));
+        }
+        Ok(())
+    }
+}
+
+lazy_static! {
+    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = SessionManager::new();
+}
+
+struct SessionManager {
+    sessions: HashSet<*const GA_session>,
+}
+unsafe impl Send for SessionManager {}
+
+impl SessionManager {
+    fn new() -> Arc<Mutex<Self>> {
+        let manager = Arc::new(Mutex::new(SessionManager {
+            sessions: HashSet::new(),
+        }));
+
+        // spawn a thread polling for updates every 5 seconds
+        let t_manager = Arc::clone(&manager);
+        thread::spawn(move || loop {
+            t_manager.lock().unwrap().tick().expect("tick failed");
+            thread::sleep(Duration::from_secs(5));
+        });
+
+        manager
+    }
+
+    fn register(&mut self, sess: *const GA_session) -> Result<(), Error> {
+        debug!("SessionManager::register({:?})", sess);
+        if self.sessions.insert(sess) {
+            Ok(())
+        } else {
+            bail!("session already registered")
+        }
+    }
+
+    fn remove(&mut self, sess: *const GA_session) -> Result<(), Error> {
+        debug!("SessionManager::remove({:?})", sess);
+        if self.sessions.remove(&sess) {
+            unsafe { drop(&*sess) };
+            Ok(())
+        } else {
+            bail!("session not registered")
+        }
+    }
+
+    fn tick(&self) -> Result<(), Error> {
+        info!("tick(), {} active sessions", self.sessions.len());
+        for sess in &self.sessions {
+            let sess = unsafe { &**sess };
+            sess.tick()?;
         }
         Ok(())
     }
@@ -203,18 +262,21 @@ static INIT_LOGGER: Once = ONCE_INIT;
 
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
+    debug!("GA_create_session()");
+
     #[cfg(feature = "android_logger")]
     INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
 
-    debug!("GA_create_session()");
-    ret_ptr!(ret, GA_session::new())
+    let session = GA_session::new();
+    try_ret!(SESS_MANAGER.lock().unwrap().register(session));
+
+    ret_ptr!(ret, session)
 }
 
 #[no_mangle]
 pub extern "C" fn GA_destroy_session(sess: *const GA_session) -> i32 {
-    unsafe {
-        drop(&*sess);
-    }
+    try_ret!(SESS_MANAGER.lock().unwrap().remove(sess));
+
     GA_OK
 }
 
