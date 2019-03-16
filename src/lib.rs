@@ -173,7 +173,7 @@ pub extern "C" fn GA_connect(
 
     let network_name = read_str(network_name);
     let network = tryret!(Network::network(&network_name).or_err("missing network"));
-    let rpc = tryret!(network.connect().context("rpc connection failed"));
+    let rpc = tryret!(network.connect());
     let wallet = Wallet::new(rpc);
 
     sess.network = Some(network_name);
@@ -209,7 +209,7 @@ pub extern "C" fn GA_register_user(
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    tryret!(wallet.register(&mnemonic).context("register failed"));
+    tryret!(wallet.register(&mnemonic));
 
     unsafe {
         *ret = GA_auth_handler::success();
@@ -237,7 +237,7 @@ pub extern "C" fn GA_login(
         return GA_ERROR;
     }
 
-    tryret!(wallet.login(&mnemonic).context("login failed"));
+    tryret!(wallet.login(&mnemonic));
 
     unsafe {
         *ret = GA_auth_handler::success();
@@ -262,9 +262,7 @@ pub extern "C" fn GA_get_transactions(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let txs = tryret!(wallet
-        .get_transactions(&details)
-        .context("get_transactions failed"));
+    let txs = tryret!(wallet.get_transactions(&details));
 
     // XXX should we free details or should the client?
 
@@ -284,9 +282,7 @@ pub extern "C" fn GA_get_transaction_details(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx = tryret!(wallet
-        .get_transaction(&txid)
-        .context("get_transaction failed"));
+    let tx = tryret!(wallet.get_transaction(&txid));
 
     unsafe { *ret = GA_json::ptr(tx) }
 
@@ -304,7 +300,7 @@ pub extern "C" fn GA_get_balance(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let balance = tryret!(wallet.get_balance(&details).context("get_balanca failed"));
+    let balance = tryret!(wallet.get_balance(&details));
 
     unsafe {
         *ret = GA_json::ptr(balance);
@@ -328,9 +324,7 @@ pub extern "C" fn GA_create_transaction(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx_detail_unsigned = tryret!(wallet
-        .create_transaction(&details)
-        .context("create_transaction failed"));
+    let tx_detail_unsigned = tryret!(wallet.create_transaction(&details));
 
     unsafe {
         *ret = GA_json::ptr(tx_detail_unsigned);
@@ -350,9 +344,7 @@ pub extern "C" fn GA_sign_transaction(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let tx_detail_signed = tryret!(wallet
-        .sign_transaction(&tx_detail_unsigned)
-        .context("sign_transaction failed"));
+    let tx_detail_signed = tryret!(wallet.sign_transaction(&tx_detail_unsigned));
 
     unsafe {
         *ret = GA_auth_handler::done(tx_detail_signed);
@@ -395,9 +387,7 @@ pub extern "C" fn GA_get_receive_address(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let address = tryret!(wallet
-        .get_receive_address()
-        .context("get_receive_address failed"));
+    let address = tryret!(wallet.get_receive_address());
 
     unsafe { *ret = make_str(address) }
 
@@ -414,7 +404,7 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let account = tryret!(wallet.get_account(0).context("get_account failed"));
+    let account = tryret!(wallet.get_account(0));
 
     unsafe {
         // always returns a list of a single account
@@ -434,7 +424,7 @@ pub extern "C" fn GA_get_subaccount(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let account = tryret!(wallet.get_account(index).context("get_account failed"));
+    let account = tryret!(wallet.get_account(index));
 
     unsafe {
         *ret = GA_json::ptr(account);
@@ -536,9 +526,7 @@ pub extern "C" fn GA_convert_amount(
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let units = tryret!(wallet
-        .convert_amount(&value_details)
-        .context("convert_amount failed"));
+    let units = tryret!(wallet.convert_amount(&value_details));
 
     unsafe {
         *ret = GA_json::ptr(units);
@@ -552,9 +540,7 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
 
     let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
-    let estimates = tryret!(wallet
-        .get_fee_estimates()
-        .context("get_fee_estimates failed"));
+    let estimates = tryret!(wallet.get_fee_estimates());
 
     unsafe {
         *ret = GA_json::ptr(estimates);
