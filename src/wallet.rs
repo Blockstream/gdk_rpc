@@ -81,7 +81,7 @@ impl Wallet {
         let tip = self.rpc.get_best_block_hash()?;
         if self.tip != Some(tip) {
             let info = self.rpc.get_block_info(&tip)?;
-            msgs.push(json!({ "block_height": info.height, "block_hash": tip.to_hex() }));
+            msgs.push(json!({ "event": "block", "block": { "block_height": info.height, "block_hash": tip.to_hex() } }));
             self.tip = Some(tip);
         }
 
