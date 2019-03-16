@@ -26,25 +26,23 @@ extern crate stderrlog;
 
 pub mod errors;
 pub mod network;
+pub mod session;
 pub mod wallet;
 
-use failure::Error;
 use log::LevelFilter;
 use serde_json::Value;
 
-use std::collections::HashSet;
 use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
 use crate::errors::OptionExt;
 use crate::network::Network;
+use crate::session::{GA_session, SessionManager};
 use crate::wallet::Wallet;
 
 const GA_OK: i32 = 0;
@@ -57,6 +55,10 @@ const GA_NONE: u32 = 0;
 const GA_INFO: u32 = 1;
 const GA_DEBUG: u32 = 2;
 
+lazy_static! {
+    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = SessionManager::new();
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct GA_json(Value);
@@ -64,104 +66,6 @@ pub struct GA_json(Value);
 impl GA_json {
     fn new(data: Value) -> *const GA_json {
         unsafe { transmute(Box::new(GA_json(data))) }
-    }
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct GA_session {
-    network: Option<String>,
-    wallet: Option<Wallet>,
-    notify: Option<(
-        extern "C" fn(*const libc::c_void, *const GA_json),
-        *const libc::c_void,
-    )>,
-}
-
-impl GA_session {
-    fn new() -> *mut GA_session {
-        let sess = GA_session {
-            network: None,
-            wallet: None,
-            notify: None,
-        };
-        unsafe { transmute(Box::new(sess)) }
-    }
-
-    fn wallet(&self) -> Option<&Wallet> {
-        self.wallet.as_ref()
-    }
-
-    fn notify(&self, data: Value) {
-        debug!("push notification: {:?}", data);
-        if let Some((handler, context)) = self.notify {
-            handler(context, GA_json::new(data));
-        } else {
-            warn!("no registered handler to receive notification");
-        }
-    }
-
-    fn tick(&mut self) -> Result<(), Error> {
-        if let Some(ref mut wallet) = self.wallet {
-            for msg in wallet.updates()? {
-                self.notify(msg)
-            }
-        }
-        Ok(())
-    }
-}
-
-lazy_static! {
-    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = SessionManager::new();
-}
-
-struct SessionManager {
-    sessions: HashSet<*mut GA_session>,
-}
-unsafe impl Send for SessionManager {}
-
-impl SessionManager {
-    fn new() -> Arc<Mutex<Self>> {
-        let manager = Arc::new(Mutex::new(SessionManager {
-            sessions: HashSet::new(),
-        }));
-
-        // spawn a thread polling for updates every 5 seconds
-        let t_manager = Arc::clone(&manager);
-        thread::spawn(move || loop {
-            t_manager.lock().unwrap().tick().expect("tick failed");
-            thread::sleep(Duration::from_secs(5));
-        });
-
-        manager
-    }
-
-    fn register(&mut self, sess: *mut GA_session) -> Result<(), Error> {
-        debug!("SessionManager::register({:?})", sess);
-        if self.sessions.insert(sess) {
-            Ok(())
-        } else {
-            bail!("session already registered")
-        }
-    }
-
-    fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
-        debug!("SessionManager::remove({:?})", sess);
-        if self.sessions.remove(&sess) {
-            unsafe { drop(&*sess) };
-            Ok(())
-        } else {
-            bail!("session not registered")
-        }
-    }
-
-    fn tick(&self) -> Result<(), Error> {
-        info!("tick(), {} active sessions", self.sessions.len());
-        for sess in &self.sessions {
-            let sess = unsafe { &mut **sess };
-            sess.tick()?;
-        }
-        Ok(())
     }
 }
 
