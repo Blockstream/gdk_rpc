@@ -17,6 +17,8 @@ extern crate serde_derive;
 extern crate lazy_static;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate log;
 
 pub mod errors;
 pub mod network;
@@ -73,7 +75,7 @@ impl GA_session {
     }
 
     fn push(&self, data: Value) {
-        println!("push notification: {:?}", data);
+        debug!("push notification: {:?}", data);
         if let Some((handler, context)) = self.push {
             handler(context, GA_json::ptr(data));
         }
@@ -120,7 +122,7 @@ macro_rules! tryret {
     ($x:expr) => {
         match $x {
             Err(err) => {
-                println!("error: {:?}", err);
+                debug!("error: {:?}", err);
                 return GA_ERROR;
             }
             Ok(x) => x,
@@ -146,7 +148,7 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
-    println!("GA_create_session()");
+    debug!("GA_create_session()");
     unsafe {
         *ret = GA_session::ptr();
     }
@@ -178,7 +180,7 @@ pub extern "C" fn GA_connect(
     sess.log_level = Some(log_level);
     sess.wallet = Some(wallet);
 
-    println!("GA_connect() {:?}", sess);
+    debug!("GA_connect() {:?}", sess);
     GA_OK
 }
 
@@ -188,7 +190,7 @@ pub extern "C" fn GA_disconnect(sess: *mut GA_session) -> i32 {
     sess.network = None;
     // TODO cleanup rpc connection
     sess.wallet = None;
-    println!("GA_disconnect() {:?}", sess);
+    debug!("GA_disconnect() {:?}", sess);
     GA_OK
 }
 
@@ -205,7 +207,7 @@ pub extern "C" fn GA_register_user(
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
 
-    println!("GA_register_user({}) {:?}", mnemonic, sess);
+    debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
     tryret!(wallet.register(&mnemonic).context("register failed"));
 
@@ -231,7 +233,7 @@ pub extern "C" fn GA_login(
     let mnemonic = read_str(mnemonic);
 
     if read_str(password).len() > 0 {
-        println!("password-encrypted mnemonics are unsupported");
+        warn!("password-encrypted mnemonics are unsupported");
         return GA_ERROR;
     }
 
@@ -241,7 +243,7 @@ pub extern "C" fn GA_login(
         *ret = GA_auth_handler::success();
     }
 
-    println!("GA_login({}) {:?}", mnemonic, sess);
+    debug!("GA_login({}) {:?}", mnemonic, sess);
     GA_OK
 }
 
