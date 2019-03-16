@@ -22,7 +22,6 @@ pub mod errors;
 pub mod network;
 pub mod wallet;
 
-use bitcoincore_rpc::RpcApi;
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
