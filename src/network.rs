@@ -8,7 +8,7 @@ use std::path::Path;
 
 use crate::errors::OptionExt;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Network {
     name: String,
     network: String,
@@ -38,8 +38,8 @@ pub struct Network {
     wamp_cert_roots: Vec<String>,
 }
 
-lazy_static! {
-    static ref NETWORKS: HashMap<String, Network> = {
+impl Network {
+    pub fn list() -> HashMap<String, Network> {
         let mut networks = HashMap::new();
 
         let rpc_url = env::var("BITCOIND_URL")
@@ -96,7 +96,10 @@ lazy_static! {
                 name: "Regtest LAN".to_string(),
                 network: "mainnet".to_string(),
                 rpc_url: "http://192.168.2.108:18443".to_string(),
-                rpc_cred: Some(("satoshi".to_string(), "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string())),
+                rpc_cred: Some((
+                    "satoshi".to_string(),
+                    "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string(),
+                )),
                 rpc_cookie: None,
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
@@ -116,21 +119,14 @@ lazy_static! {
                 wamp_url: "".to_string(),
                 wamp_cert_pins: vec![],
                 wamp_cert_roots: vec![],
-
             },
         );
 
         networks
-    };
-}
-
-impl Network {
-    pub fn list() -> &'static HashMap<String, Network> {
-        &NETWORKS
     }
 
-    pub fn get(id: &String) -> Option<&'static Network> {
-        NETWORKS.get(id)
+    pub fn get(id: &String) -> Option<Network> {
+        Network::list().get(id).cloned()
     }
 
     pub fn connect(&self) -> Result<Client, Error> {
