@@ -21,6 +21,8 @@ pub struct GA_session {
     )>,
 }
 
+// TODO protect access to raw GA_session pointers behind a mutex?
+
 impl GA_session {
     pub fn new() -> *mut GA_session {
         let sess = GA_session {

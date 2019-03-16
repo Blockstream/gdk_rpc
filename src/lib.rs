@@ -196,14 +196,15 @@ pub extern "C" fn GA_connect(
     let rpc = try_ret!(network.connect());
     let wallet = Wallet::new(rpc);
 
-    sess.network = Some(network_name);
-
     log::set_max_level(log_filter(log_level));
 
+    sess.network = Some(network_name);
     sess.wallet = Some(wallet);
+
     try_ret!(sess.tick());
 
     debug!("GA_connect() {:?}", sess);
+
     GA_OK
 }
 

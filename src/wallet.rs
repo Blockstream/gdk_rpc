@@ -81,6 +81,7 @@ impl Wallet {
         let mut msgs = vec![
             //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
             json!({ "event": "network", "network": { "connected": true } }),
+            // XXX update fees less often?
             json!({ "event": "fees", "fees": self.get_fee_estimates()? }),
         ];
 
