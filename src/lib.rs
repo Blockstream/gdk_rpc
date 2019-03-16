@@ -114,6 +114,18 @@ fn read_str(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
 
+macro_rules! tryret {
+    ($x:expr) => {
+        match $x {
+            Err(err) => {
+                println!("error: {:?}", err);
+                return GA_ERROR;
+            }
+            Ok(x) => x,
+        }
+    };
+}
+
 //
 // Networks
 //
@@ -156,18 +168,9 @@ pub extern "C" fn GA_connect(
     let sess = unsafe { &mut *sess };
 
     let network_name = read_str(network_name);
-    let network = match Network::network(&network_name) {
-        None => return GA_ERROR,
-        Some(network) => network,
-    };
+    let network = tryret!(Network::network(&network_name).ok_or("missing network"));
 
-    let wallet = match Wallet::new(&network) {
-        Err(err) => {
-            println!("failed connect: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(wallet) => wallet,
-    };
+    let wallet = tryret!(Wallet::new(&network));
 
     sess.network = Some(network_name);
     sess.log_level = Some(log_level);
@@ -195,17 +198,14 @@ pub extern "C" fn GA_register_user(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = sess.wallet.as_ref().unwrap();
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
 
     println!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    if let Err(err) = wallet.register(&mnemonic) {
-        println!("failed registering wallet: {}", err);
-        return GA_ERROR;
-    }
+    tryret!(wallet.register(&mnemonic));
 
     unsafe {
         *ret = GA_auth_handler::success();
@@ -223,7 +223,7 @@ pub extern "C" fn GA_login(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = sess.wallet.as_ref().unwrap();
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
@@ -233,10 +233,7 @@ pub extern "C" fn GA_login(
         return GA_ERROR;
     }
 
-    if let Err(err) = wallet.login(&mnemonic) {
-        println!("login failed: {}", err);
-        return GA_ERROR;
-    }
+    tryret!(wallet.login(&mnemonic));
 
     unsafe {
         *ret = GA_auth_handler::success();
@@ -259,18 +256,9 @@ pub extern "C" fn GA_get_transactions(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let txs = match wallet.get_transactions(&details) {
-        Err(err) => {
-            println!("get_transations failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(txs) => txs,
-    };
+    let txs = tryret!(wallet.get_transactions(&details));
 
     // XXX should we free details or should the client?
 
@@ -288,18 +276,9 @@ pub extern "C" fn GA_get_transaction_details(
     let sess = unsafe { &*sess };
     let txid = read_str(txid);
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let tx = match wallet.get_transaction(&txid) {
-        Err(err) => {
-            println!("get_transaction_details failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(tx) => tx,
-    };
+    let tx = tryret!(wallet.get_transaction(&txid));
 
     unsafe { *ret = GA_json::ptr(tx) }
 
@@ -315,18 +294,9 @@ pub extern "C" fn GA_get_balance(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let balance = match wallet.get_balance(&details) {
-        Err(err) => {
-            println!("get_balance failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(balance) => balance,
-    };
+    let balance = tryret!(wallet.get_balance(&details));
 
     unsafe {
         *ret = GA_json::ptr(balance);
@@ -348,18 +318,9 @@ pub extern "C" fn GA_create_transaction(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let tx_detail_unsigned = match wallet.create_transaction(&details) {
-        Err(err) => {
-            println!("create_transaction failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(t) => t,
-    };
+    let tx_detail_unsigned = tryret!(wallet.create_transaction(&details));
 
     unsafe {
         *ret = GA_json::ptr(tx_detail_unsigned);
@@ -377,18 +338,9 @@ pub extern "C" fn GA_sign_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let tx_detail_signed = match wallet.sign_transaction(&tx_detail_unsigned) {
-        Err(err) => {
-            println!("sign_transaction failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(t) => t,
-    };
+    let tx_detail_signed = tryret!(wallet.sign_transaction(&tx_detail_unsigned));
 
     unsafe {
         *ret = GA_auth_handler::done(tx_detail_signed);
@@ -406,18 +358,9 @@ pub extern "C" fn GA_send_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let txid = match wallet.send_transaction(&tx_detail_signed) {
-        Err(err) => {
-            println!("send_transaction failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(txid) => txid,
-    };
+    let txid = tryret!(wallet.send_transaction(&tx_detail_signed));
 
     unsafe {
         *ret = GA_auth_handler::done(json!(txid));
@@ -438,18 +381,9 @@ pub extern "C" fn GA_get_receive_address(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let address = match wallet.get_receive_address() {
-        Err(err) => {
-            println!("get_receive_address failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(address) => address,
-    };
+    let address = tryret!(wallet.get_receive_address());
 
     unsafe { *ret = make_str(address) }
 
@@ -464,18 +398,9 @@ pub extern "C" fn GA_get_receive_address(
 pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let account = match wallet.get_account(0) {
-        Err(err) => {
-            println!("get_account failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(account) => account,
-    };
+    let account = tryret!(wallet.get_account(0));
 
     unsafe {
         // always returns a list of a single account
@@ -493,18 +418,9 @@ pub extern "C" fn GA_get_subaccount(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let account = match wallet.get_account(index) {
-        Err(err) => {
-            println!("get_account failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(account) => account,
-    };
+    let account = tryret!(wallet.get_account(index));
 
     unsafe {
         *ret = GA_json::ptr(account);
@@ -584,10 +500,7 @@ pub extern "C" fn GA_get_available_currencies(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
     let currencies = wallet.get_available_currencies();
 
@@ -607,18 +520,9 @@ pub extern "C" fn GA_convert_amount(
     let sess = unsafe { &*sess };
     let value_details = &unsafe { &*value_details }.0;
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let units = match wallet.convert_amount(&value_details) {
-        Err(err) => {
-            println!("convert_amount failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(units) => units,
-    };
+    let units = tryret!(wallet.convert_amount(&value_details));
 
     unsafe {
         *ret = GA_json::ptr(units);
@@ -630,18 +534,9 @@ pub extern "C" fn GA_convert_amount(
 pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = match sess.wallet {
-        Some(ref wallet) => wallet,
-        None => return GA_ERROR,
-    };
+    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
 
-    let estimates = match wallet.get_fee_estimates() {
-        Err(err) => {
-            println!("get_estimates failed: {:?}", err);
-            return GA_ERROR;
-        }
-        Ok(estimates) => estimates,
-    };
+    let estimates = tryret!(wallet.get_fee_estimates());
 
     unsafe {
         *ret = GA_json::ptr(estimates);
