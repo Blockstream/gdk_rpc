@@ -107,6 +107,12 @@ extern "C" {
         -> i32;
     fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
 
+    fn GA_set_notification_handler(
+        sess: *mut GA_session,
+        handler: extern "C" fn(*const GA_json, *const GA_json),
+        context: *const GA_json,
+    ) -> i32;
+
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 }
@@ -236,7 +242,14 @@ fn main() {
             GA_validate_mnemonic(mnemonic.as_ptr(), &mut is_valid)
         );
         info!("mnemonic is valid: {}", is_valid);
+
+        let ctx = make_json(json!({ "test": "my ctx" }));
+        GA_set_notification_handler(sess, notification_handler, ctx);
     }
+}
+
+extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
+    info!("notification handler called: {:?} -- {:?}", json_obj(ctx), json_obj(data));
 }
 
 fn json_obj(json: *const GA_json) -> Value {

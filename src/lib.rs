@@ -53,6 +53,10 @@ pub struct GA_session {
     network: Option<String>,
     log_level: Option<u32>,
     wallet: Option<Wallet>,
+    push: Option<(
+        extern "C" fn(*const libc::c_void, *const libc::c_void),
+        *const libc::c_void,
+    )>,
 }
 
 impl GA_session {
@@ -61,8 +65,16 @@ impl GA_session {
             network: None,
             log_level: None,
             wallet: None,
+            push: None,
         };
         unsafe { transmute(Box::new(sess)) }
+    }
+
+    fn push(&self, data: Value) {
+        println!("push notification: {:?}", data);
+        if let Some((handler, context)) = self.push {
+            handler(context, GA_json::ptr(data) as *const libc::c_void);
+        }
     }
 }
 
@@ -638,6 +650,23 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     GA_OK
 }
 
+
+//
+// Push notifications
+//
+
+#[no_mangle]
+pub extern "C" fn GA_set_notification_handler(
+    sess: *mut GA_session,
+    handler: extern "C" fn(*const libc::c_void, *const libc::c_void),
+    context: *const libc::c_void,
+) -> i32 {
+    let sess = unsafe { &mut *sess };
+    sess.push = Some((handler, context));
+    sess.push(json!({ "init": "hello world" }));
+    GA_OK
+}
+
 //
 // JSON utilities
 //
@@ -784,16 +813,6 @@ pub extern "C" fn GA_get_twofactor_config(
     unsafe {
         *ret = GA_json::ptr(res);
     }
-    GA_OK
-}
-
-#[no_mangle]
-pub extern "C" fn GA_set_notification_handler(
-    _sess: *const GA_session,
-    _handler: *const libc::c_void,
-    _context: *const libc::c_void,
-) -> i32 {
-    // we don't actually register or notify, just report success back
     GA_OK
 }
 
