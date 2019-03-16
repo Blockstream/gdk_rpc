@@ -42,7 +42,7 @@ lazy_static! {
             .into_owned();
 
         networks.insert(
-            "regtest".to_string(),
+            "regtest-cookie".to_string(),
             Network {
                 name: "Regtest".to_string(),
                 network: "regtest".to_string(),
@@ -52,6 +52,19 @@ lazy_static! {
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
             },
         );
+
+        networks.insert(
+            "mainnet".to_string(),
+            Network {
+                name: "Regtest LAN".to_string(),
+                network: "mainnet".to_string(),
+                rpc_url: "http://192.168.2.108:18443".to_string(),
+                rpc_cred: Some(("satoshi".to_string(), "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string())),
+                rpc_cookie: None,
+                tx_explorer_url: "https://blockstream.info/tx/".to_string(),
+            },
+        );
+
         networks
     };
 }

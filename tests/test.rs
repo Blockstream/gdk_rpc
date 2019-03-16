@@ -146,7 +146,7 @@ fn a1_test_create_session() {
 
 #[test]
 fn a2_test_connect() {
-    let network = CString::new("regtest").unwrap();
+    let network = CString::new("regtest-cookie").unwrap();
     assert_eq!(GA_OK, unsafe { GA_connect(SESS.0, network.as_ptr(), 5) });
     debug!("connected");
 }
