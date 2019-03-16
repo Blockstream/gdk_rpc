@@ -23,11 +23,13 @@ pub mod network;
 pub mod wallet;
 
 use serde_json::Value;
+use failure::ResultExt;
 
 use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
 
+use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::wallet::Wallet;
 
@@ -168,7 +170,7 @@ pub extern "C" fn GA_connect(
     let sess = unsafe { &mut *sess };
 
     let network_name = read_str(network_name);
-    let network = tryret!(Network::network(&network_name).ok_or("missing network"));
+    let network = tryret!(Network::network(&network_name).or_err("missing network"));
 
     let wallet = tryret!(Wallet::new(&network));
 
@@ -198,7 +200,7 @@ pub extern "C" fn GA_register_user(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
@@ -223,7 +225,7 @@ pub extern "C" fn GA_login(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     // hw_device is currently ignored
     let mnemonic = read_str(mnemonic);
@@ -256,7 +258,7 @@ pub extern "C" fn GA_get_transactions(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let txs = tryret!(wallet.get_transactions(&details));
 
@@ -276,7 +278,7 @@ pub extern "C" fn GA_get_transaction_details(
     let sess = unsafe { &*sess };
     let txid = read_str(txid);
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let tx = tryret!(wallet.get_transaction(&txid));
 
@@ -294,7 +296,7 @@ pub extern "C" fn GA_get_balance(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let balance = tryret!(wallet.get_balance(&details));
 
@@ -318,7 +320,7 @@ pub extern "C" fn GA_create_transaction(
     let sess = unsafe { &*sess };
     let details = &unsafe { &*details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let tx_detail_unsigned = tryret!(wallet.create_transaction(&details));
 
@@ -338,7 +340,7 @@ pub extern "C" fn GA_sign_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let tx_detail_signed = tryret!(wallet.sign_transaction(&tx_detail_unsigned));
 
@@ -358,7 +360,7 @@ pub extern "C" fn GA_send_transaction(
     let sess = unsafe { &*sess };
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let txid = tryret!(wallet.send_transaction(&tx_detail_signed));
 
@@ -381,7 +383,7 @@ pub extern "C" fn GA_get_receive_address(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let address = tryret!(wallet.get_receive_address());
 
@@ -398,7 +400,7 @@ pub extern "C" fn GA_get_receive_address(
 pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let account = tryret!(wallet.get_account(0));
 
@@ -418,7 +420,7 @@ pub extern "C" fn GA_get_subaccount(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let account = tryret!(wallet.get_account(index));
 
@@ -500,7 +502,7 @@ pub extern "C" fn GA_get_available_currencies(
 ) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let currencies = wallet.get_available_currencies();
 
@@ -520,7 +522,7 @@ pub extern "C" fn GA_convert_amount(
     let sess = unsafe { &*sess };
     let value_details = &unsafe { &*value_details }.0;
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let units = tryret!(wallet.convert_amount(&value_details));
 
@@ -534,7 +536,7 @@ pub extern "C" fn GA_convert_amount(
 pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sess = unsafe { &*sess };
 
-    let wallet = tryret!(sess.wallet.as_ref().ok_or("no loaded wallet"));
+    let wallet = tryret!(sess.wallet.as_ref().or_err("no loaded wallet"));
 
     let estimates = tryret!(wallet.get_fee_estimates());
 
