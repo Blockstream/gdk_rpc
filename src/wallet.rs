@@ -22,11 +22,16 @@ const PER_PAGE: u32 = 10;
 pub struct Wallet {
     rpc: RpcClient,
     tip: Option<Sha256dHash>,
+    last_tx: Option<Sha256dHash>,
 }
 
 impl Wallet {
     pub fn new(rpc: RpcClient) -> Self {
-        Wallet { rpc, tip: None }
+        Wallet {
+            rpc,
+            tip: None,
+            last_tx: None,
+        }
     }
 
     pub fn register(&self, mnemonic: &String) -> Result<(), Error> {
@@ -72,17 +77,28 @@ impl Wallet {
     }
 
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
+        // always report network and fees
         let mut msgs = vec![
             //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
             json!({ "event": "network", "network": { "connected": true } }),
             json!({ "event": "fees", "fees": self.get_fee_estimates()? }),
         ];
 
+        // check for new blocks
         let tip = self.rpc.get_best_block_hash()?;
         if self.tip != Some(tip) {
             let info = self.rpc.get_block_info(&tip)?;
             msgs.push(json!({ "event": "block", "block": { "block_height": info.height, "block_hash": tip.to_hex() } }));
             self.tip = Some(tip);
+        }
+
+        // check for new transactions
+        if let Some(last_tx) = self._get_transactions(1, 0)?.0.get(0) {
+            let txid = Sha256dHash::from_hex(last_tx.get("txhash").req()?.as_str().req()?)?;
+            if self.last_tx != Some(txid) {
+                self.last_tx = Some(txid);
+                msgs.push(json!({ "event": "transaction", "transaction": last_tx }));
+            }
         }
 
         Ok(msgs)
@@ -125,11 +141,20 @@ impl Wallet {
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
         let page = details.get("page").req()?.as_u64().req()? as u32;
+        let (txs, potentially_has_more) = self._get_transactions(PER_PAGE, PER_PAGE * page)?;
 
+        Ok(json!({
+            "list": txs,
+            "page_id": page,
+            "next_page_id": if potentially_has_more { Some(page+1) } else { None },
+        }))
+    }
+
+    fn _get_transactions(&self, limit: u32, start: u32) -> Result<(Vec<Value>, bool), Error> {
         // fetch listtranssactions
         let txdescs = self.rpc.call::<Value>(
             "listtransactions",
-            &[json!("*"), json!(PER_PAGE), json!(PER_PAGE * page)],
+            &[json!("*"), json!(limit), json!(start)],
         )?;
         let txdescs = txdescs.as_array().unwrap();
         let potentially_has_more = txdescs.len() as u32 == PER_PAGE;
@@ -148,12 +173,7 @@ impl Wallet {
                 format_gdk_tx(txdesc, tx)
             })
             .collect::<Result<Vec<Value>, Error>>()?;
-
-        Ok(json!({
-            "list": txs,
-            "page_id": page,
-            "next_page_id": if potentially_has_more { Some(page+1) } else { None },
-        }))
+        Ok((txs, potentially_has_more))
     }
 
     pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
