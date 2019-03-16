@@ -109,7 +109,6 @@ extern "C" {
 
     fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
         -> i32;
-    fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
 
     fn GA_set_notification_handler(
         sess: *mut GA_session,
@@ -119,6 +118,10 @@ extern "C" {
 
     fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
+
+    fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
+    fn GA_destroy_json(handler: *const GA_json) -> i32;
+    fn GA_destroy_session(handler: *const GA_session) -> i32;
 }
 
 struct GA_session_ptr(*mut GA_session);
@@ -322,6 +325,7 @@ fn read_json(json: *const GA_json) -> Value {
     let mut s: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_convert_json_to_string(json, &mut s) });
     let s = unsafe { CStr::from_ptr(s) }.to_str().unwrap();
+    unsafe { GA_destroy_json(json) };
     serde_json::from_str(&s).unwrap()
 }
 

@@ -617,6 +617,7 @@ pub extern "C" fn GA_convert_json_value_to_json(
 
 #[no_mangle]
 pub extern "C" fn GA_destroy_json(ptr: *mut GA_json) -> i32 {
+    debug!("GA_destroy_json({:?})", ptr);
     // TODO make sure this works
     unsafe {
         drop(&*ptr);
