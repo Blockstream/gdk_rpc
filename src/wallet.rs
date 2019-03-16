@@ -24,10 +24,10 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(network: &Network) -> Self {
-        Wallet {
-            rpc: network.connect(),
-        }
+    pub fn new(network: &Network) -> Result<Self, Error> {
+        Ok(Wallet {
+            rpc: network.connect()?,
+        })
     }
 
     pub fn register(&self, mnemonic: &String) -> Result<(), Error> {

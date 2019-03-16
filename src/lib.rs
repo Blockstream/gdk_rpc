@@ -149,7 +149,13 @@ pub extern "C" fn GA_connect(
         Some(network) => network,
     };
 
-    let wallet = Wallet::new(&network);
+    let wallet = match Wallet::new(&network) {
+        Err(err) => {
+            println!("failed connect: {:?}", err);
+            return GA_ERROR;
+        },
+        Ok(wallet) => wallet,
+    };
 
     sess.network = Some(network_name);
     sess.log_level = Some(log_level);
