@@ -249,7 +249,11 @@ fn main() {
 }
 
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
-    info!("notification handler called: {:?} -- {:?}", json_obj(ctx), json_obj(data));
+    info!(
+        "notification handler called: {:?} -- {:?}",
+        json_obj(ctx),
+        json_obj(data)
+    );
 }
 
 fn json_obj(json: *const GA_json) -> Value {

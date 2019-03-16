@@ -54,7 +54,7 @@ pub struct GA_session {
     log_level: Option<u32>,
     wallet: Option<Wallet>,
     push: Option<(
-        extern "C" fn(*const libc::c_void, *const libc::c_void),
+        extern "C" fn(*const libc::c_void, *const GA_json),
         *const libc::c_void,
     )>,
 }
@@ -73,7 +73,7 @@ impl GA_session {
     fn push(&self, data: Value) {
         println!("push notification: {:?}", data);
         if let Some((handler, context)) = self.push {
-            handler(context, GA_json::ptr(data) as *const libc::c_void);
+            handler(context, GA_json::ptr(data));
         }
     }
 }
@@ -650,7 +650,6 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     GA_OK
 }
 
-
 //
 // Push notifications
 //
@@ -658,7 +657,7 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
 #[no_mangle]
 pub extern "C" fn GA_set_notification_handler(
     sess: *mut GA_session,
-    handler: extern "C" fn(*const libc::c_void, *const libc::c_void),
+    handler: extern "C" fn(*const libc::c_void, *const GA_json),
     context: *const libc::c_void,
 ) -> i32 {
     let sess = unsafe { &mut *sess };
