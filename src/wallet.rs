@@ -21,11 +21,12 @@ const PER_PAGE: u32 = 10;
 
 pub struct Wallet {
     rpc: RpcClient,
+    tip: Option<Sha256dHash>,
 }
 
 impl Wallet {
     pub fn new(rpc: RpcClient) -> Self {
-        Wallet { rpc }
+        Wallet { rpc, tip: None }
     }
 
     pub fn register(&self, mnemonic: &String) -> Result<(), Error> {
@@ -70,10 +71,21 @@ impl Wallet {
         self.register(mnemonic)
     }
 
-    pub fn get_tip(&self) -> Result<Value, Error> {
-        let block_hash = self.rpc.get_best_block_hash()?;
-        let block_info = self.rpc.get_block_info(&block_hash)?;
-        Ok(json!({ "block_height": block_info.height, "block_hash": block_hash.to_hex() }))
+    pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
+        let mut msgs = vec![
+            //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
+            json!({ "event": "network", "network": { "connected": true } }),
+            json!({ "event": "fees", "fees": self.get_fee_estimates()? }),
+        ];
+
+        let tip = self.rpc.get_best_block_hash()?;
+        if self.tip != Some(tip) {
+            let info = self.rpc.get_block_info(&tip)?;
+            msgs.push(json!({ "block_height": info.height, "block_hash": tip.to_hex() }));
+            self.tip = Some(tip);
+        }
+
+        Ok(msgs)
     }
 
     pub fn get_account(&self, subaccount: u32) -> Result<Value, Error> {

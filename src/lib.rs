@@ -79,7 +79,7 @@ pub struct GA_session {
 }
 
 impl GA_session {
-    fn new() -> *const GA_session {
+    fn new() -> *mut GA_session {
         let sess = GA_session {
             network: None,
             wallet: None,
@@ -101,12 +101,11 @@ impl GA_session {
         }
     }
 
-    fn tick(&self) -> Result<(), Error> {
-        if let Some(ref wallet) = self.wallet {
-            //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
-            self.notify(json!({ "event": "network", "network": { "connected": true } }));
-            self.notify(json!({ "event": "fees", "fees": wallet.get_fee_estimates()? }));
-            self.notify(json!({ "event": "block", "block": wallet.get_tip()? }));
+    fn tick(&mut self) -> Result<(), Error> {
+        if let Some(ref mut wallet) = self.wallet {
+            for msg in wallet.updates()? {
+                self.notify(msg)
+            }
         }
         Ok(())
     }
@@ -117,7 +116,7 @@ lazy_static! {
 }
 
 struct SessionManager {
-    sessions: HashSet<*const GA_session>,
+    sessions: HashSet<*mut GA_session>,
 }
 unsafe impl Send for SessionManager {}
 
@@ -137,7 +136,7 @@ impl SessionManager {
         manager
     }
 
-    fn register(&mut self, sess: *const GA_session) -> Result<(), Error> {
+    fn register(&mut self, sess: *mut GA_session) -> Result<(), Error> {
         debug!("SessionManager::register({:?})", sess);
         if self.sessions.insert(sess) {
             Ok(())
@@ -146,7 +145,7 @@ impl SessionManager {
         }
     }
 
-    fn remove(&mut self, sess: *const GA_session) -> Result<(), Error> {
+    fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
         debug!("SessionManager::remove({:?})", sess);
         if self.sessions.remove(&sess) {
             unsafe { drop(&*sess) };
@@ -159,7 +158,7 @@ impl SessionManager {
     fn tick(&self) -> Result<(), Error> {
         info!("tick(), {} active sessions", self.sessions.len());
         for sess in &self.sessions {
-            let sess = unsafe { &**sess };
+            let sess = unsafe { &mut **sess };
             sess.tick()?;
         }
         Ok(())
@@ -267,14 +266,14 @@ pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     #[cfg(feature = "android_logger")]
     INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
 
-    let session = GA_session::new();
-    try_ret!(SESS_MANAGER.lock().unwrap().register(session));
+    let sess = GA_session::new();
+    try_ret!(SESS_MANAGER.lock().unwrap().register(sess));
 
-    ret_ptr!(ret, session)
+    ret_ptr!(ret, sess)
 }
 
 #[no_mangle]
-pub extern "C" fn GA_destroy_session(sess: *const GA_session) -> i32 {
+pub extern "C" fn GA_destroy_session(sess: *mut GA_session) -> i32 {
     try_ret!(SESS_MANAGER.lock().unwrap().remove(sess));
 
     GA_OK
