@@ -34,6 +34,7 @@ use serde_json::Value;
 use std::ffi::{CStr, CString};
 use std::mem::transmute;
 use std::os::raw::c_char;
+#[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
 use crate::errors::OptionExt;
