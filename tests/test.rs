@@ -1,4 +1,5 @@
 extern crate libc;
+#[cfg(feature="stderr_logger")]
 extern crate stderrlog;
 #[macro_use]
 extern crate serde_json;
@@ -135,6 +136,7 @@ lazy_static! {
 
 #[test]
 fn a0_setup() {
+    #[cfg(feature="stderr_logger")]
     stderrlog::new().verbosity(3).init().unwrap();
 }
 

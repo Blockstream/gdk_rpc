@@ -13,7 +13,8 @@ export CC_aarch64_linux_android=aarch64-linux-android21-clang
 
 cp cargo-config.toml ~/.cargo/config
 
-cargo build --target i686-linux-android --release
-cargo build --target x86_64-linux-android --release
-cargo build --target armv7-linux-androideabi --release
-cargo build --target aarch64-linux-android --release
+FEAT="--features stderr_logger"
+cargo build $FEAT --target i686-linux-android --release
+cargo build $FEAT --target x86_64-linux-android --release
+cargo build $FEAT --target armv7-linux-androideabi --release
+cargo build $FEAT --target aarch64-linux-android --release

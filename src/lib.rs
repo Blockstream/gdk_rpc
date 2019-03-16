@@ -19,14 +19,20 @@ extern crate lazy_static;
 extern crate failure;
 #[macro_use]
 extern crate log;
+#[cfg(feature = "android_logger")]
+extern crate android_log;
+#[cfg(feature = "stderr_logger")]
+extern crate stderrlog;
 
 pub mod errors;
 pub mod network;
 pub mod wallet;
 
+use log::LevelFilter;
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
+use std::sync::{Once, ONCE_INIT};
 use std::mem::transmute;
 use std::os::raw::c_char;
 
@@ -39,6 +45,10 @@ const GA_ERROR: i32 = -1;
 
 const GA_TRUE: u32 = 1;
 const GA_FALSE: u32 = 0;
+
+const GA_NONE: u32 = 0;
+const GA_INFO: u32 = 1;
+const GA_DEBUG: u32 = 2;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -54,7 +64,6 @@ impl GA_json {
 #[repr(C)]
 pub struct GA_session {
     network: Option<String>,
-    log_level: Option<u32>,
     wallet: Option<Wallet>,
     notify: Option<(
         extern "C" fn(*const libc::c_void, *const GA_json),
@@ -66,7 +75,6 @@ impl GA_session {
     fn new() -> *const GA_session {
         let sess = GA_session {
             network: None,
-            log_level: None,
             wallet: None,
             notify: None,
         };
@@ -123,6 +131,16 @@ fn read_str(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
 
+// https://docs.rs/stderrlog/0.4.1/src/stderrlog/lib.rs.html#389-400
+fn log_filter(level: u32) -> LevelFilter {
+    match level {
+        GA_NONE => LevelFilter::Error,
+        GA_INFO => LevelFilter::Info,
+        GA_DEBUG => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    }
+}
+
 //
 // Macros
 //
@@ -166,9 +184,19 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 //
 // Session & account management
 //
+//
+
+
+#[cfg(feature="android_logger")]
+static INIT_LOGGER: Once = ONCE_INIT;
 
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
+    #[cfg(feature="android_logger")]
+    INIT_LOGGER.call_once(|| {
+        android_log::init("gdk_rpc").unwrap()
+    });
+
     debug!("GA_create_session()");
     ret_ptr!(ret, GA_session::new())
 }
@@ -195,8 +223,9 @@ pub extern "C" fn GA_connect(
     let wallet = Wallet::new(rpc);
 
     sess.network = Some(network_name);
-    //sess.log_level = Some(log_level);
-    //stderrlog::new().verbosity(3).init().unwrap();
+
+    log::set_max_level(log_filter(log_level));
+
     sess.wallet = Some(wallet);
 
     debug!("GA_connect() {:?}", sess);
