@@ -179,7 +179,7 @@ macro_rules! ret_json {
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
-    ret_json!(ret, Network::list())
+    ret_json!(ret, json!({ "all_networks": Network::list() }))
 }
 
 //
