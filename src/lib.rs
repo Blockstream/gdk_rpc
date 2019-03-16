@@ -32,9 +32,9 @@ use log::LevelFilter;
 use serde_json::Value;
 
 use std::ffi::{CStr, CString};
-use std::sync::{Once, ONCE_INIT};
 use std::mem::transmute;
 use std::os::raw::c_char;
+use std::sync::{Once, ONCE_INIT};
 
 use crate::errors::OptionExt;
 use crate::network::Network;
@@ -186,16 +186,13 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 //
 //
 
-
-#[cfg(feature="android_logger")]
+#[cfg(feature = "android_logger")]
 static INIT_LOGGER: Once = ONCE_INIT;
 
 #[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
-    #[cfg(feature="android_logger")]
-    INIT_LOGGER.call_once(|| {
-        android_log::init("gdk_rpc").unwrap()
-    });
+    #[cfg(feature = "android_logger")]
+    INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
 
     debug!("GA_create_session()");
     ret_ptr!(ret, GA_session::new())
