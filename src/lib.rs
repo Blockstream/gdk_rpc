@@ -225,6 +225,12 @@ pub extern "C" fn GA_connect(
 
     sess.wallet = Some(wallet);
 
+    let wallet = sess.wallet().unwrap();
+    //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
+    sess.notify(json!({ "event": "network", "network": { "connected": true } }));
+    sess.notify(json!({ "event": "fees", "fees": try_ret!(wallet.get_fee_estimates()) }));
+    sess.notify(json!({ "event": "block", "block": try_ret!(wallet.get_tip()) }));
+
     debug!("GA_connect() {:?}", sess);
     GA_OK
 }
@@ -530,7 +536,6 @@ pub extern "C" fn GA_set_notification_handler(
 ) -> i32 {
     let sess = unsafe { &mut *sess };
     sess.notify = Some((handler, context));
-    sess.notify(json!({ "init": "hello world" }));
     GA_OK
 }
 
