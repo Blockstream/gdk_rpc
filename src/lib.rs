@@ -28,6 +28,7 @@ pub mod errors;
 pub mod network;
 pub mod wallet;
 
+use failure::Error;
 use log::LevelFilter;
 use serde_json::Value;
 
@@ -93,6 +94,16 @@ impl GA_session {
         } else {
             warn!("no registered handler to receive notification");
         }
+    }
+
+    fn tick(&self) -> Result<(), Error> {
+        if let Some(ref wallet) = self.wallet {
+            //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
+            self.notify(json!({ "event": "network", "network": { "connected": true } }));
+            self.notify(json!({ "event": "fees", "fees": wallet.get_fee_estimates()? }));
+            self.notify(json!({ "event": "block", "block": wallet.get_tip()? }));
+        }
+        Ok(())
     }
 }
 
@@ -225,12 +236,7 @@ pub extern "C" fn GA_connect(
     log::set_max_level(log_filter(log_level));
 
     sess.wallet = Some(wallet);
-
-    let wallet = sess.wallet().unwrap();
-    //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
-    sess.notify(json!({ "event": "network", "network": { "connected": true } }));
-    sess.notify(json!({ "event": "fees", "fees": try_ret!(wallet.get_fee_estimates()) }));
-    sess.notify(json!({ "event": "block", "block": try_ret!(wallet.get_tip()) }));
+    try_ret!(sess.tick());
 
     debug!("GA_connect() {:?}", sess);
     GA_OK
