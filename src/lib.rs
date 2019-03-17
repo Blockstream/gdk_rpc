@@ -28,9 +28,9 @@ pub mod constants;
 pub mod errors;
 pub mod network;
 pub mod session;
+pub mod settings;
 pub mod util;
 pub mod wallet;
-pub mod settings;
 
 use serde_json::Value;
 
@@ -556,7 +556,24 @@ pub extern "C" fn GA_set_notification_handler(
 pub extern "C" fn GA_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
+
     ok_json!(ret, json!(sess.settings))
+}
+
+#[no_mangle]
+pub extern "C" fn GA_change_settings(
+    sess: *mut GA_session,
+    settings: *const GA_json,
+    ret: *mut *const GA_auth_handler,
+) -> i32 {
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get_mut(sess).unwrap();
+    let new_settings = &unsafe { &*settings }.0;
+
+    // XXX should we allow patching just some setting fields instead of replacing it?
+    sess.settings = tryit!(serde_json::from_value(new_settings.clone()));
+
+    ok!(ret, GA_auth_handler::success())
 }
 
 //
@@ -813,15 +830,6 @@ pub extern "C" fn GA_decrypt(
     _sess: *const GA_session,
     _data: *const GA_json,
     _ret: *mut *const GA_json,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_change_settings(
-    _sess: *const GA_session,
-    _settings: *const GA_json,
-    _ret: *mut *const GA_auth_handler,
 ) -> i32 {
     GA_ERROR
 }

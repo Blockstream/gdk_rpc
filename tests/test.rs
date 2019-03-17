@@ -57,6 +57,11 @@ extern "C" {
     fn GA_validate_mnemonic(mnemonic: *const c_char, ret: &mut u32) -> i32;
 
     fn GA_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GA_change_settings(
+        sess: *const GA_session,
+        new_settings: *const GA_json,
+        ret: *mut *const GA_auth_handler,
+    ) -> i32;
 
     fn GA_get_receive_address(
         sess: *const GA_session,
@@ -275,10 +280,25 @@ fn a4_test_get_address() {
 #[test]
 fn a4_test_settings() {
     let mut settings: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_get_settings(SESS.0, &mut settings) });
+    let mut settings = read_json(settings);
+    debug!("get settings: {:#?}\n", settings);
+    assert_eq!(settings.get("unit").unwrap().as_str().unwrap(), "btc");
+
+    *settings.get_mut("unit").unwrap() = json!("satoshi");
+
+    let settings = make_json(settings);
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_settings(SESS.0, &mut settings)
+        GA_change_settings(SESS.0, settings, &mut auth_handler)
     });
-    debug!("get settings: {:#?}\n", read_json(settings));
+    debug!("change settings status: {:#?}\n", get_status(auth_handler));
+
+    let mut settings: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_get_settings(SESS.0, &mut settings) });
+    let mut settings = read_json(settings);
+    debug!("get settings again: {:#?}\n", settings);
+    assert_eq!(settings.get("unit").unwrap().as_str().unwrap(), "satoshi");
 }
 
 #[test]

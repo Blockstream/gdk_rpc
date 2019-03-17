@@ -1,4 +1,4 @@
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
     unit: Unit,
     pricing: FiatPricing,
@@ -13,8 +13,14 @@ impl Settings {
     pub fn default() -> Self {
         Settings {
             unit: Unit::Btc,
-            pricing: FiatPricing { currency: FiatCurrency::USD, exchange: RateExchange::Bitstamp, },
-            notifications: NotificationSettings { email_incoming: false, email_outgoing: false },
+            pricing: FiatPricing {
+                currency: FiatCurrency::USD,
+                exchange: RateExchange::Bitstamp,
+            },
+            notifications: NotificationSettings {
+                email_incoming: false,
+                email_outgoing: false,
+            },
             required_num_blocks: 2, // XXX
             sound: false,
             altimeout: 5, // XXX
@@ -22,7 +28,7 @@ impl Settings {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 enum Unit {
     #[serde(rename = "btc")]
     Btc,
@@ -31,27 +37,27 @@ enum Unit {
     #[serde(rename = "bits")]
     Bits,
     #[serde(rename = "satoshi")]
-    Satoshi
+    Satoshi,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct FiatPricing {
     currency: FiatCurrency,
     exchange: RateExchange,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 enum FiatCurrency {
     USD,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 enum RateExchange {
     #[serde(rename = "BITSTAMP")]
-    Bitstamp
+    Bitstamp,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct NotificationSettings {
     email_incoming: bool,
     email_outgoing: bool,
