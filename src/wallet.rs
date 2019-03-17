@@ -8,16 +8,14 @@ use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
-use chrono::NaiveDateTime;
 use failure::Error;
 use serde_json::Value;
 
+use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
+use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time};
 
-const SAT_PER_BTC: f64 = 100_000_000.0;
-const SAT_PER_MBTC: f64 = 100_000.0;
-const SAT_PER_BIT: f64 = 100.0;
-const PER_PAGE: u32 = 10;
+const PER_PAGE: u32 = 2;
 
 pub struct Wallet {
     rpc: RpcClient,
@@ -278,6 +276,7 @@ impl Wallet {
     }
 
     pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
+        // XXX should convert_amonut support negative numbers?
         let amount = details.get("satoshi").req()?.as_u64().req()?;
         Ok(self._convert_amount(amount))
     }
@@ -314,23 +313,6 @@ impl fmt::Debug for Wallet {
         write!(f, "Wallet {{ }}")
     }
 }
-
-fn btc_to_usat(amount: f64) -> u64 {
-    (amount * SAT_PER_BTC) as u64
-}
-
-fn btc_to_isat(amount: f64) -> i64 {
-    (amount * SAT_PER_BTC) as i64
-}
-
-fn extend(mut dest: Value, mut src: Value) -> Result<Value, Error> {
-    let dest = dest.as_object_mut().req()?;
-    for (k, v) in src.as_object_mut().req()? {
-        dest.insert(k.to_string(), v.take());
-    }
-    Ok(json!(dest))
-}
-
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
@@ -403,8 +385,4 @@ fn make_output(desc: &Value) -> Result<TxOut, Error> {
         value,
         script_pubkey: address.script_pubkey(),
     })
-}
-
-fn fmt_time(unix_ts: u64) -> String {
-    NaiveDateTime::from_timestamp(unix_ts as i64, 0).to_string()
 }

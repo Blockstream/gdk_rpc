@@ -24,15 +24,16 @@ extern crate android_log;
 #[cfg(feature = "stderr_logger")]
 extern crate stderrlog;
 
+pub mod constants;
 pub mod errors;
 pub mod network;
 pub mod session;
+pub mod util;
 pub mod wallet;
 
-use log::LevelFilter;
 use serde_json::Value;
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::mem::transmute;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
@@ -40,20 +41,12 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
+use crate::constants::{GA_ERROR, GA_FALSE, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
+use crate::util::{log_filter, make_str, read_str};
 use crate::wallet::Wallet;
-
-const GA_OK: i32 = 0;
-const GA_ERROR: i32 = -1;
-
-const GA_TRUE: u32 = 1;
-const GA_FALSE: u32 = 0;
-
-const GA_NONE: u32 = 0;
-const GA_INFO: u32 = 1;
-const GA_DEBUG: u32 = 2;
 
 lazy_static! {
     static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
@@ -98,24 +91,6 @@ impl GA_auth_handler {
             GA_auth_handler::Error(err) => json!({ "status": "error", "error": err }),
             GA_auth_handler::Done(res) => json!({ "status": "done", "result": res }),
         }
-    }
-}
-
-fn make_str(data: String) -> *const c_char {
-    CString::new(data).unwrap().into_raw()
-}
-
-fn read_str(s: *const c_char) -> String {
-    unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
-}
-
-// https://docs.rs/stderrlog/0.4.1/src/stderrlog/lib.rs.html#389-400
-fn log_filter(level: u32) -> LevelFilter {
-    match level {
-        GA_NONE => LevelFilter::Error,
-        GA_INFO => LevelFilter::Info,
-        GA_DEBUG => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
     }
 }
 
