@@ -630,6 +630,11 @@ pub extern "C" fn GA_get_twofactor_config(
     ok_json!(ret, json!({ "enabled": false }))
 }
 
+#[no_mangle]
+pub extern "C" fn GA_reconnect_hint(_sess: *const GA_session, _hint: *const GA_json) -> i32 {
+    GA_OK
+}
+
 //
 // Unimplemented and GA_ERROR's
 //
@@ -642,12 +647,6 @@ pub extern "C" fn GA_connect_with_proxy(
     _use_tor: u32,
     _log_level: u32,
 ) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_reconnect_hint(_sess: *const GA_session, _hint: *const GA_json) -> i32 {
-    // TODO can we just GA_OK and ignore it?
     GA_ERROR
 }
 
