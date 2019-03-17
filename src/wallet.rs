@@ -387,11 +387,17 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "user_signed": true,
         "instant": false,
 
+        "subaccount": 0,
+        "subaccounts": [],
+        "data": "",
+        "private_key": "",
+
         "fee": fee,
         "fee_rate": (fee as f64)/(vsize as f64),
 
-        //"inputs": tx.input.iter().map(format_gdk_input).collect(),
-        //"outputs": tx.output.iter().map(format_gdk_output).collect(),
+        "addresses": [],
+        "inputs": [], // tx.input.iter().map(format_gdk_input).collect(),
+        "outputs": [], //tx.output.iter().map(format_gdk_output).collect(),
     }))
 }
 
