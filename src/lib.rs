@@ -545,6 +545,9 @@ pub extern "C" fn GA_set_notification_handler(
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
     sess.notify = Some((handler, context));
+
+    self.notify(json!({ "event": "settings", settings: self.settings }));
+
     GA_OK
 }
 
