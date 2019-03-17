@@ -251,7 +251,7 @@ fn a4_test_subaccount() {
 
 #[test]
 fn a4_test_transactions() {
-    let details = make_json(json!({ "page": 0 }));
+    let details = make_json(json!({ "page_id": 0 }));
     let mut txs: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GA_get_transactions(SESS.0, details, &mut txs)
