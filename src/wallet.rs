@@ -82,7 +82,7 @@ impl Wallet {
         // always report network and fees
         let mut msgs = vec![
             //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
-            json!({ "event": "network", "network": { "connected": true } }),
+            json!({ "event": "network", "network": { "connected": true, limit: true, waiting: 0, elapsed: 0 } }),
         ];
 
         // check for new blocks
