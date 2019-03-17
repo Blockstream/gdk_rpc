@@ -123,7 +123,7 @@ fn log_filter(level: u32) -> LevelFilter {
 // Macros
 //
 
-macro_rules! try_ret {
+macro_rules! tryit {
     ($x:expr) => {
         match $x {
             Err(err) => {
@@ -135,7 +135,7 @@ macro_rules! try_ret {
     };
 }
 
-macro_rules! ret_ptr {
+macro_rules! ok {
     ($t:expr, $x:expr) => {
         unsafe {
             *$t = $x;
@@ -144,9 +144,9 @@ macro_rules! ret_ptr {
     };
 }
 
-macro_rules! ret_json {
+macro_rules! ok_json {
     ($t:expr, $x:expr) => {
-        ret_ptr!($t, GA_json::new(json!($x)));
+        ok!($t, GA_json::new(json!($x)));
     };
 }
 
@@ -156,7 +156,7 @@ macro_rules! ret_json {
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
-    ret_json!(ret, json!({ "all_networks": Network::list() }))
+    ok_json!(ret, json!({ "all_networks": Network::list() }))
 }
 
 //
@@ -177,12 +177,12 @@ pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     let mut sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.register();
 
-    ret_ptr!(ret, sess)
+    ok!(ret, sess)
 }
 
 #[no_mangle]
 pub extern "C" fn GA_destroy_session(sess: *mut GA_session) -> i32 {
-    try_ret!(SESS_MANAGER.lock().unwrap().remove(sess));
+    tryit!(SESS_MANAGER.lock().unwrap().remove(sess));
     GA_OK
 }
 
@@ -196,8 +196,8 @@ pub extern "C" fn GA_connect(
     let sess = sm.get_mut(sess).unwrap();
     let network_name = read_str(network_name);
 
-    let network = try_ret!(Network::get(&network_name).or_err("missing network"));
-    let rpc = try_ret!(network.connect());
+    let network = tryit!(Network::get(&network_name).or_err("missing network"));
+    let rpc = tryit!(network.connect());
     let wallet = Wallet::new(rpc);
 
     log::set_max_level(log_filter(log_level));
@@ -206,7 +206,7 @@ pub extern "C" fn GA_connect(
     sess.wallet = Some(wallet);
 
     // XXX wait for the periodic polling thread to run?
-    try_ret!(sess.tick());
+    tryit!(sess.tick());
 
     debug!("GA_connect() {:?}", sess);
 
@@ -238,10 +238,10 @@ pub extern "C" fn GA_register_user(
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    try_ret!(wallet.register(&mnemonic));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    tryit!(wallet.register(&mnemonic));
 
-    ret_ptr!(ret, GA_auth_handler::success())
+    ok!(ret, GA_auth_handler::success())
 }
 
 #[no_mangle]
@@ -263,10 +263,10 @@ pub extern "C" fn GA_login(
 
     debug!("GA_login({}) {:?}", mnemonic, sess);
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    try_ret!(wallet.login(&mnemonic));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    tryit!(wallet.login(&mnemonic));
 
-    ret_ptr!(ret, GA_auth_handler::success())
+    ok!(ret, GA_auth_handler::success())
 }
 
 //
@@ -283,12 +283,12 @@ pub extern "C" fn GA_get_transactions(
     let sess = sm.get(sess).unwrap();
     let details = &unsafe { &*details }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let txs = try_ret!(wallet.get_transactions(&details));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let txs = tryit!(wallet.get_transactions(&details));
 
     // XXX should we free details or should the client?
 
-    ret_json!(ret, txs)
+    ok_json!(ret, txs)
 }
 
 #[no_mangle]
@@ -301,10 +301,10 @@ pub extern "C" fn GA_get_transaction_details(
     let sess = sm.get(sess).unwrap();
     let txid = read_str(txid);
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let tx = try_ret!(wallet.get_transaction(&txid));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let tx = tryit!(wallet.get_transaction(&txid));
 
-    ret_json!(ret, tx)
+    ok_json!(ret, tx)
 }
 
 #[no_mangle]
@@ -317,10 +317,10 @@ pub extern "C" fn GA_get_balance(
     let sess = sm.get(sess).unwrap();
     let details = &unsafe { &*details }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let balance = try_ret!(wallet.get_balance(&details));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let balance = tryit!(wallet.get_balance(&details));
 
-    ret_json!(ret, balance)
+    ok_json!(ret, balance)
 }
 
 //
@@ -337,10 +337,10 @@ pub extern "C" fn GA_create_transaction(
     let sess = sm.get(sess).unwrap();
     let details = &unsafe { &*details }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let tx_detail_unsigned = try_ret!(wallet.create_transaction(&details));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let tx_detail_unsigned = tryit!(wallet.create_transaction(&details));
 
-    ret_json!(ret, tx_detail_unsigned)
+    ok_json!(ret, tx_detail_unsigned)
 }
 
 #[no_mangle]
@@ -353,10 +353,10 @@ pub extern "C" fn GA_sign_transaction(
     let sess = sm.get(sess).unwrap();
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let tx_detail_signed = try_ret!(wallet.sign_transaction(&tx_detail_unsigned));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let tx_detail_signed = tryit!(wallet.sign_transaction(&tx_detail_unsigned));
 
-    ret_ptr!(ret, GA_auth_handler::done(tx_detail_signed))
+    ok!(ret, GA_auth_handler::done(tx_detail_signed))
 }
 
 #[no_mangle]
@@ -369,10 +369,10 @@ pub extern "C" fn GA_send_transaction(
     let sess = sm.get(sess).unwrap();
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let txid = try_ret!(wallet.send_transaction(&tx_detail_signed));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let txid = tryit!(wallet.send_transaction(&tx_detail_signed));
 
-    ret_ptr!(ret, GA_auth_handler::done(json!(txid)))
+    ok!(ret, GA_auth_handler::done(json!(txid)))
 }
 
 //
@@ -388,10 +388,10 @@ pub extern "C" fn GA_get_receive_address(
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let address = try_ret!(wallet.get_receive_address());
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let address = tryit!(wallet.get_receive_address());
 
-    ret_ptr!(ret, make_str(address))
+    ok!(ret, make_str(address))
 }
 
 //
@@ -403,11 +403,11 @@ pub extern "C" fn GA_get_subaccounts(sess: *const GA_session, ret: *mut *const G
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let account = try_ret!(wallet.get_account(0));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let account = tryit!(wallet.get_account(0));
 
     // always returns a list of a single account
-    ret_json!(ret, [account])
+    ok_json!(ret, [account])
 }
 
 #[no_mangle]
@@ -419,10 +419,10 @@ pub extern "C" fn GA_get_subaccount(
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let account = try_ret!(wallet.get_account(index));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let account = tryit!(wallet.get_account(index));
 
-    ret_json!(ret, account)
+    ok_json!(ret, account)
 }
 
 //
@@ -433,7 +433,7 @@ pub extern "C" fn GA_get_subaccount(
 pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
     let mnemonic = Wallet::generate_mnemonic();
 
-    ret_ptr!(ret, make_str(mnemonic))
+    ok!(ret, make_str(mnemonic))
 }
 
 #[no_mangle]
@@ -445,7 +445,7 @@ pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -
         GA_FALSE
     };
 
-    ret_ptr!(ret, is_valid)
+    ok!(ret, is_valid)
 }
 
 //
@@ -460,7 +460,7 @@ pub extern "C" fn GA_auth_handler_get_status(
     let auth_handler = unsafe { &*auth_handler };
     let status = auth_handler.to_json();
 
-    ret_json!(ret, status)
+    ok_json!(ret, status)
 }
 
 #[no_mangle]
@@ -485,10 +485,10 @@ pub extern "C" fn GA_get_available_currencies(
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let currencies = wallet.get_available_currencies();
 
-    ret_json!(ret, currencies)
+    ok_json!(ret, currencies)
 }
 
 #[no_mangle]
@@ -501,20 +501,20 @@ pub extern "C" fn GA_convert_amount(
     let sess = sm.get(sess).unwrap();
     let value_details = &unsafe { &*value_details }.0;
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let units = try_ret!(wallet.convert_amount(&value_details));
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let units = tryit!(wallet.convert_amount(&value_details));
 
-    ret_json!(ret, units)
+    ok_json!(ret, units)
 }
 #[no_mangle]
 pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
-    let wallet = try_ret!(sess.wallet().or_err("no loaded wallet"));
-    let estimates = try_ret!(wallet.get_fee_estimates());
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let estimates = tryit!(wallet.get_fee_estimates());
 
-    ret_json!(ret, estimates)
+    ok_json!(ret, estimates)
 }
 
 //
@@ -541,14 +541,14 @@ pub extern "C" fn GA_set_notification_handler(
 pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32 {
     let json = &unsafe { &*json }.0;
     let res = json.to_string();
-    ret_ptr!(ret, make_str(res))
+    ok!(ret, make_str(res))
 }
 
 #[no_mangle]
 pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
     let jstr = read_str(jstr);
     let json: Value = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
-    ret_json!(ret, json)
+    ok_json!(ret, json)
 }
 
 #[no_mangle]
@@ -560,7 +560,7 @@ pub extern "C" fn GA_convert_json_value_to_string(
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
     let res = json.get(&path).expect("path missing").to_string();
-    ret_ptr!(ret, make_str(res))
+    ok!(ret, make_str(res))
 }
 
 #[no_mangle]
@@ -576,7 +576,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
         .expect("path missing")
         .as_u64()
         .expect("invalid number") as u32;
-    ret_ptr!(ret, res)
+    ok!(ret, res)
 }
 
 #[no_mangle]
@@ -592,7 +592,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
         .expect("path missing")
         .as_u64()
         .expect("invalid number");
-    ret_ptr!(ret, res)
+    ok!(ret, res)
 }
 
 #[no_mangle]
@@ -605,7 +605,7 @@ pub extern "C" fn GA_convert_json_value_to_json(
     let path = read_str(path);
     let jstr = json.get(&path).expect("path missing").to_string();
     let res: Value = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
-    ret_json!(ret, res)
+    ok_json!(ret, res)
 }
 
 #[no_mangle]
@@ -634,7 +634,7 @@ pub extern "C" fn GA_destroy_string(ptr: *mut c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_get_system_message(_sess: *const GA_session, ret: *mut *const c_char) -> i32 {
     // an empty string implies no system messages
-    ret_ptr!(ret, make_str("".to_string()))
+    ok!(ret, make_str("".to_string()))
 }
 
 #[no_mangle]
@@ -643,7 +643,7 @@ pub extern "C" fn GA_ack_system_message(
     _message_text: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    ret_ptr!(ret, GA_auth_handler::success())
+    ok!(ret, GA_auth_handler::success())
 }
 
 #[no_mangle]
@@ -652,7 +652,7 @@ pub extern "C" fn GA_get_twofactor_config(
     ret: *mut *const GA_json,
 ) -> i32 {
     // 2FA is always off
-    ret_json!(ret, json!({ "enabled": false }))
+    ok_json!(ret, json!({ "enabled": false }))
 }
 
 //
