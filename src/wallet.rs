@@ -312,10 +312,7 @@ impl Wallet {
     }
 
     pub fn validate_mnemonic(mnemonic: String) -> bool {
-        match Mnemonic::from_phrase(mnemonic, Language::English) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        Mnemonic::validate(&mnemonic, Language::English).is_ok()
     }
 }
 
