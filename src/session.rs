@@ -79,27 +79,23 @@ impl SessionManager {
     }
 
     pub fn get(&self, sess: *const GA_session) -> Result<&GA_session, Error> {
-        if !self.sessions.contains(&(sess as *mut GA_session)) {
-            bail!("session is unmanaged");
-        }
+        ensure!(
+            self.sessions.contains(&(sess as *mut GA_session)),
+            "session is unmanaged"
+        );
         Ok(unsafe { &*sess })
     }
 
     pub fn get_mut(&self, sess: *mut GA_session) -> Result<&mut GA_session, Error> {
-        if !self.sessions.contains(&sess) {
-            bail!("session is unmanaged");
-        }
+        ensure!(self.sessions.contains(&sess), "session is unmanaged");
         Ok(unsafe { &mut *sess })
     }
 
     pub fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
         debug!("SessionManager::remove({:?})", sess);
-        if self.sessions.remove(&sess) {
-            unsafe { drop(&*sess) };
-            Ok(())
-        } else {
-            bail!("session not registered")
-        }
+        ensure!(self.sessions.remove(&sess), "session is unmanaged");
+        unsafe { drop(&*sess) };
+        Ok(())
     }
 
     pub fn tick(&self) -> Result<(), Error> {
