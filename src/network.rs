@@ -48,18 +48,7 @@ impl Network {
 
         let rpc_cookie = env::var("BITCOIND_DIR")
             .ok()
-            .map_or_else(
-                || {
-                    dirs::home_dir()
-                        .unwrap()
-                        .join(".bitcoin")
-                        .join("regtest")
-                        .join(".cookie")
-                },
-                |p| Path::new(&p).join(".cookie"),
-            )
-            .to_string_lossy()
-            .into_owned();
+            .map(|p| Path::new(&p).join(".cookie").to_string_lossy().into_owned());
 
         networks.insert(
             "regtest-cookie".to_string(),
@@ -68,7 +57,7 @@ impl Network {
                 network: "regtest".to_string(),
                 rpc_url,
                 rpc_cred: None,
-                rpc_cookie: Some(rpc_cookie.to_string()),
+                rpc_cookie: rpc_cookie,
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
 
