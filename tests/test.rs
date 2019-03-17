@@ -36,6 +36,11 @@ extern "C" {
     fn GA_get_networks(ret: *mut *const GA_json) -> i32;
     fn GA_get_available_currencies(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
     fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GA_get_mnemonic_passphrase(
+        sess: *const GA_session,
+        password: *const c_char,
+        ret: *mut *const c_char,
+    ) -> i32;
     fn GA_convert_amount(
         sess: *const GA_session,
         details: *const GA_json,
@@ -137,6 +142,7 @@ lazy_static! {
 }
 
 // TODO free up resources
+// --test-threads=1
 
 #[test]
 fn a0_setup() {
@@ -163,18 +169,18 @@ fn a2_test_connect() {
     let network = CString::new("regtest-cookie").unwrap();
     assert_eq!(GA_OK, unsafe { GA_connect(SESS.0, network.as_ptr(), 5) });
     debug!("connected");
+    //std::thread::sleep(std::time::Duration::from_secs(15));
 }
 
 #[test]
 fn a3_test_account() {
     let hw_device = make_json(json!({ "type": "trezor" }));
-    let mnemonic = CString::new(
-        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light",
-    )
-    .unwrap();
+    let mnemonic =
+        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
+    let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_register_user(SESS.0, hw_device, mnemonic.as_ptr(), &mut auth_handler)
+        GA_register_user(SESS.0, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
     });
     debug!("register status: {:?}", get_status(auth_handler));
 
@@ -184,12 +190,21 @@ fn a3_test_account() {
         GA_login(
             SESS.0,
             hw_device,
-            mnemonic.as_ptr(),
+            mnemonic_c.as_ptr(),
             password.as_ptr(),
             &mut auth_handler,
         )
     });
     debug!("log in status: {:?}", get_status(auth_handler));
+
+    let mut mnemonic_r: *const c_char = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_mnemonic_passphrase(SESS.0, password.as_ptr(), &mut mnemonic_r)
+    });
+    let mnemonic_r = read_str(mnemonic_r);
+    // FIXME turn off loggin of mnemonic (here and elsewhere)
+    debug!("get_mnemonic_passphrase: {}", mnemonic_r);
+    assert_eq!(mnemonic_r, mnemonic);
 }
 
 #[test]

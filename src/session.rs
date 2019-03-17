@@ -15,6 +15,7 @@ use crate::GA_json;
 pub struct GA_session {
     pub network: Option<String>,
     pub wallet: Option<Wallet>,
+    pub mnemonic: Option<String>, // XXX plain text
     pub notify: Option<(
         extern "C" fn(*const libc::c_void, *const GA_json),
         *const libc::c_void,
@@ -26,6 +27,7 @@ impl GA_session {
         let sess = GA_session {
             network: None,
             wallet: None,
+            mnemonic: None,
             notify: None,
         };
         unsafe { transmute(Box::new(sess)) }

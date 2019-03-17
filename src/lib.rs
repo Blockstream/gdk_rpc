@@ -233,7 +233,7 @@ pub extern "C" fn GA_login(
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);
 
     if read_str(password).len() > 0 {
@@ -245,6 +245,8 @@ pub extern "C" fn GA_login(
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
+
+    sess.mnemonic = Some(mnemonic);
 
     ok!(ret, GA_auth_handler::success())
 }
@@ -442,6 +444,20 @@ pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -
     };
 
     ok!(ret, is_valid)
+}
+
+#[no_mangle]
+pub extern "C" fn GA_get_mnemonic_passphrase(
+    sess: *const GA_session,
+    _password: *const c_char,
+    ret: *mut *const c_char,
+) -> i32 {
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get(sess).unwrap();
+
+    let mnemonic = tryit!(sess.mnemonic.clone().or_err("mnemonic unavailable"));
+
+    ok!(ret, make_str(mnemonic))
 }
 
 //
@@ -769,16 +785,6 @@ pub extern "C" fn GA_set_transaction_memo(
     _memo_type: u32,
 ) -> i32 {
     GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_get_mnemonic_passphrase(
-    _sess: *const GA_session,
-    _password: *const c_char,
-    ret: *mut *const c_char,
-) -> i32 {
-    // TODO
-    ok!(ret, make_str("recipe struggle bar old they olive atom owner symptom steel link will depth true chief success cotton draft legal problem bid hen caught outer".to_string()))
 }
 
 #[no_mangle]
