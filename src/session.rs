@@ -21,10 +21,8 @@ pub struct GA_session {
     )>,
 }
 
-// TODO protect access to raw GA_session pointers behind a mutex?
-
 impl GA_session {
-    pub fn new() -> *mut GA_session {
+    fn new() -> *mut GA_session {
         let sess = GA_session {
             network: None,
             wallet: None,
@@ -77,13 +75,25 @@ impl SessionManager {
         manager
     }
 
-    pub fn register(&mut self, sess: *mut GA_session) -> Result<(), Error> {
+    pub fn register(&mut self) -> *mut GA_session {
+        let sess = GA_session::new();
         debug!("SessionManager::register({:?})", sess);
-        if self.sessions.insert(sess) {
-            Ok(())
-        } else {
-            bail!("session already registered")
+        assert!(self.sessions.insert(sess));
+        sess
+    }
+
+    pub fn get(&self, sess: *const GA_session) -> Result<&GA_session, Error> {
+        if !self.sessions.contains(&(sess as *mut GA_session)) {
+            bail!("session is unmanaged");
         }
+        Ok(unsafe { &*sess })
+    }
+
+    pub fn get_mut(&self, sess: *mut GA_session) -> Result<&mut GA_session, Error> {
+        if !self.sessions.contains(&sess) {
+            bail!("session is unmanaged");
+        }
+        Ok(unsafe { &mut *sess })
     }
 
     pub fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
