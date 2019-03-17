@@ -1,6 +1,7 @@
 use hex;
 use std::fmt;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bitcoin::{consensus::serialize, Address, Network as BNetwork, PrivateKey, Transaction, TxOut};
@@ -16,11 +17,13 @@ use crate::errors::OptionExt;
 use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time};
 
 const PER_PAGE: u32 = 2;
+const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
 pub struct Wallet {
     rpc: RpcClient,
     tip: Option<Sha256dHash>,
     last_tx: Option<Sha256dHash>,
+    cached_fees: (Value, Instant),
 }
 
 impl Wallet {
@@ -29,6 +32,7 @@ impl Wallet {
             rpc,
             tip: None,
             last_tx: None,
+            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL*2),
         }
     }
 
@@ -79,8 +83,6 @@ impl Wallet {
         let mut msgs = vec![
             //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
             json!({ "event": "network", "network": { "connected": true } }),
-            // XXX update fees less often?
-            json!({ "event": "fees", "fees": self.get_fee_estimates()? }),
         ];
 
         // check for new blocks
@@ -92,12 +94,19 @@ impl Wallet {
         }
 
         // check for new transactions
+        // XXX does the app care about the transaction data in the event?
         if let Some(last_tx) = self._get_transactions(1, 0)?.0.get(0) {
             let txid = Sha256dHash::from_hex(last_tx.get("txhash").req()?.as_str().req()?)?;
             if self.last_tx != Some(txid) {
                 self.last_tx = Some(txid);
                 msgs.push(json!({ "event": "transaction", "transaction": last_tx }));
             }
+        }
+
+        // update fees once every FEE_ESTIMATES_TTL
+        if self.cached_fees.1.elapsed() >= FEE_ESTIMATES_TTL {
+            self.cached_fees = (self._make_fee_estimates()?, Instant::now());
+            msgs.push(json!({ "event": "fees", "fees": self.cached_fees.0 }));
         }
 
         // TODO:
@@ -248,8 +257,13 @@ impl Wallet {
         Ok(self.rpc.get_new_address(None, None)?)
     }
 
-    pub fn get_fee_estimates(&self) -> Result<Value, Error> {
-        // TODO cache estimates
+    pub fn get_fee_estimates(&self) -> Option<&Value> {
+        // will not be available before the first "tick", which should
+        // happen as soon as GA_connect initializes the wallet
+        if self.cached_fees.0.is_null() { None }
+        else { Some(&self.cached_fees.0) }
+    }
+    pub fn _make_fee_estimates(&self) -> Result<Value, Error> {
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
         let minrelayfee = json!(btc_to_usat(
             mempoolinfo.get("minrelaytxfee").req()?.as_f64().req()? / 1000.0

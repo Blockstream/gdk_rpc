@@ -186,7 +186,6 @@ pub extern "C" fn GA_connect(
     sess.network = Some(network_name);
     sess.wallet = Some(wallet);
 
-    // XXX wait for the periodic polling thread to run?
     tryit!(sess.tick());
 
     debug!("GA_connect() {:?}", sess);
@@ -509,7 +508,7 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     let sess = sm.get(sess).unwrap();
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let estimates = tryit!(wallet.get_fee_estimates());
+    let estimates = tryit!(wallet.get_fee_estimates().or_err("fee estimates unavailable"));
 
     ok_json!(ret, estimates)
 }
