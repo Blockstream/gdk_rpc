@@ -773,9 +773,10 @@ pub extern "C" fn GA_set_transaction_memo(
 pub extern "C" fn GA_get_mnemonic_passphrase(
     _sess: *const GA_session,
     _password: *const c_char,
-    _ret: *mut *const c_char,
+    ret: *mut *const c_char,
 ) -> i32 {
-    GA_ERROR
+    // TODO
+    ok!(ret, make_str("recipe struggle bar old they olive atom owner symptom steel link will depth true chief success cotton draft legal problem bid hen caught outer".to_string()))
 }
 
 #[no_mangle]
