@@ -42,7 +42,7 @@ use std::sync::{Once, ONCE_INIT};
 
 use crate::errors::OptionExt;
 use crate::network::Network;
-use crate::session::{GA_session, SessionManager};
+use crate::session::{GA_session, SessionManager, spawn_ticker};
 use crate::wallet::Wallet;
 
 const GA_OK: i32 = 0;
@@ -56,7 +56,11 @@ const GA_INFO: u32 = 1;
 const GA_DEBUG: u32 = 2;
 
 lazy_static! {
-    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = SessionManager::new();
+    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
+        let sm = SessionManager::new();
+        spawn_ticker(Arc::clone(&sm));
+        sm
+    };
 }
 
 #[derive(Debug)]
@@ -201,6 +205,7 @@ pub extern "C" fn GA_connect(
     sess.network = Some(network_name);
     sess.wallet = Some(wallet);
 
+    // XXX wait for the periodic polling thread to run?
     try_ret!(sess.tick());
 
     debug!("GA_connect() {:?}", sess);

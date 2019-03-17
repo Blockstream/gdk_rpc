@@ -61,18 +61,9 @@ unsafe impl Send for SessionManager {}
 
 impl SessionManager {
     pub fn new() -> Arc<Mutex<Self>> {
-        let manager = Arc::new(Mutex::new(SessionManager {
+        Arc::new(Mutex::new(SessionManager {
             sessions: HashSet::new(),
-        }));
-
-        // spawn a thread polling for updates every 5 seconds
-        let t_manager = Arc::clone(&manager);
-        thread::spawn(move || loop {
-            t_manager.lock().unwrap().tick().expect("tick failed");
-            thread::sleep(Duration::from_secs(5));
-        });
-
-        manager
+        }))
     }
 
     pub fn register(&mut self) -> *mut GA_session {
@@ -114,4 +105,11 @@ impl SessionManager {
         }
         Ok(())
     }
+}
+
+pub fn spawn_ticker(manager: Arc<Mutex<SessionManager>>) {
+    thread::spawn(move || loop {
+        manager.lock().unwrap().tick().expect("tick failed");
+        thread::sleep(Duration::from_secs(5));
+    });
 }
