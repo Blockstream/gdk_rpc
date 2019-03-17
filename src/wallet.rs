@@ -38,7 +38,7 @@ impl Wallet {
         let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
         let seed = Seed::new(&mnem, "");
 
-        // TODO seed -> secret key conversion
+        // FIXME seed -> secret key conversion
         let skey = secp256k1::SecretKey::from_slice(&seed.as_bytes()[0..32]).unwrap();
 
         // TODO network
@@ -196,7 +196,7 @@ impl Wallet {
 
         let tx = Transaction {
             version: 2,
-            lock_time: 0,
+            lock_time: 0, // anti fee snipping?
             input: vec![],
             output: addresses
                 .iter()
@@ -250,7 +250,7 @@ impl Wallet {
     }
 
     pub fn get_fee_estimates(&self) -> Result<Value, Error> {
-        // TODO
+        // TODO cache estimates
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
         let minrelayfee = json!(btc_to_usat(
             mempoolinfo.get("minrelaytxfee").req()?.as_f64().req()? / 1000.0
@@ -275,6 +275,7 @@ impl Wallet {
     }
 
     pub fn get_available_currencies(&self) -> Value {
+        // TODO
         json!({ "all": [ "USD" ], "per_exchange": { "BITSTAMP": [ "USD" ] } })
     }
 
