@@ -1,5 +1,4 @@
 use bitcoincore_rpc::Client;
-use dirs;
 use failure::Error;
 use std::collections::HashMap;
 use std::env;
