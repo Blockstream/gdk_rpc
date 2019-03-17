@@ -190,7 +190,7 @@ impl Wallet {
         format_gdk_tx(&txdesc, tx)
     }
 
-    pub fn create_transaction(&self, details: &Value) -> Result<Value, Error> {
+    pub fn create_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("create_transaction(): {:?}", details);
 
         // XXX use createrawtx?
@@ -224,19 +224,10 @@ impl Wallet {
 
         debug!("create_transaction funded_tx: {:?}", funded_tx);
 
-        // make sure "hex" is available, fail otherwise
-        funded_tx.get("hex").req()?;
-
-        let mut res = funded_tx;
-        // an empty "error" is required to indicate success
-        res.as_object_mut()
-            .req()?
-            .insert("error".to_string(), json!(""));
-
-        Ok(res)
+        Ok(funded_tx.get("hex").req()?.as_str().req()?.to_string())
     }
 
-    pub fn sign_transaction(&self, details: &Value) -> Result<Value, Error> {
+    pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
         let tx_hex = details.get("hex").req()?.as_str().req()?.to_string();
 
         let signed_tx: Value = self
@@ -250,13 +241,7 @@ impl Wallet {
             bail!("the transaction cannot be signed: {}", errors)
         }
 
-        let mut res = signed_tx;
-        // an empty "error" is required to indicate success
-        res.as_object_mut()
-            .req()?
-            .insert("error".to_string(), json!(""));
-
-        Ok(res)
+        Ok(signed_tx.get("hex").req()?.as_str().req()?.to_string())
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {

@@ -329,7 +329,7 @@ fn a4_send_tx() {
     let status = get_status(auth_handler);
     debug!("send_transaction status: {:#?}\n", status);
 
-    let txid = CString::new(status.get("result").unwrap().as_str().unwrap()).unwrap();
+    let txid = CString::new(status.pointer("/result/txid").unwrap().as_str().unwrap()).unwrap();
 
     let mut loaded_tx: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
