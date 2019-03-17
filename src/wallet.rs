@@ -113,13 +113,15 @@ impl Wallet {
             bail!("multi-account is unsupported");
         }
 
+        let has_transactions = self._get_transactions(1, 0)?.1;
+
         extend(
             json!({
                 "type": "core",
                 "pointer": 0,
                 "receiving_id": "",
                 "name": "RPC wallet",
-                "has_transactions": true, // TODO
+                "has_transactions": has_transactions,
             }),
             self._get_balance(0)?,
         )
