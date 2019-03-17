@@ -4,7 +4,9 @@ set -eo pipefail
 apt update -qq
 apt upgrade --no-install-recommends -yqq
 
-apt install --no-install-recommends -yqq build-essential clang curl ca-certificates unzip
+apt install --no-install-recommends -yqq build-essential clang curl ca-certificates unzip git automake autoconf pkg-config libtool virtualenv ninja-build llvm-dev swig openjdk-8-jdk python3-{pip,setuptools,wheel}
+ln -s /usr/bin/python3 /usr/bin/python
+update-java-alternatives -s java-1.8.0-openjdk-amd64
 
 SHA256SUM_NDK=0fbb1645d0f1de4dde90a4ff79ca5ec4899c835e729d692f433fda501623257a
 curl -sL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r19b-linux-x86_64.zip
@@ -32,10 +34,13 @@ curl -sL -o liquid.tar.gz https://github.com/Blockstream/liquid/releases/downloa
  && ln -s liquid-3.14.1.23 liquid \
  && rm liquid.tar.gz
 
+git clone --quiet --depth 1 --single-branch --branch release_0.0.7 https://github.com/Blockstream/gdk.git
+pip3 install --require-hashes -r /gdk/tools/requirements.txt
+
 
 if [ -f /.dockerenv ]; then
     apt remove --purge unzip -yqq
     apt -yqq autoremove
     apt -yqq clean
-    rm -rf /var/lib/apt/lists/* /var/cache/* /tmp/* /usr/share/locale/* /usr/share/man /usr/share/doc /lib/xtables/libip6* /root/.cache
+    rm -rf /var/lib/apt/lists/* /var/cache/* /tmp/* /usr/share/locale/* /usr/share/man /usr/share/doc /lib/xtables/libip6* /root/.cache /gdk/.git
 fi

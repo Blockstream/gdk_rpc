@@ -6,7 +6,7 @@ services:
 env:
   global:
     - DOCKERBUILDER=blockstream/gdk_rpc
-    - DOCKERHASH=6c868aee4149f96f3ead2992ae09390be951050ab2fe35a650c6d8a9262403d1
+    - DOCKERHASH=f9f1bc6f5d512553e4c3cd327fe74afb7707353d0a119d6a385c1d8d1ba1c23a
   matrix:
     - UNUSED=true
 
