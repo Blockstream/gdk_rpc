@@ -105,6 +105,7 @@ impl Wallet {
         // TODO:
         // {"event":"settings","settings":{"altimeout":5,"notifications":{"email_incoming":true,"email_outgoing":true},"pricing":{"currency":"MYR","exchange":"LUNO"},"required_num_blocks":24,"sound":false,"unit":"bits"}}
         // {"event":"subaccount","subaccount":{"bits":"701144.66","btc":"0.70114466","fiat":"0.7712591260000000622741556099981585311432","fiat_currency":"EUR","fiat_rate":"1.10000000000000008881784197001252","has_transactions":true,"mbtc":"701.14466","name":"","pointer":0,"receiving_id":"GA3MQKVp6pP7royXDuZcw55F2TXTgg","recovery_chain_code":"","recovery_pub_key":"","satoshi":70114466,"type":"2of2","ubtc":"701144.66"}}
+        // XXX use zmq?
 
         Ok(msgs)
     }
@@ -114,21 +115,13 @@ impl Wallet {
             bail!("multi-account is unsupported");
         }
 
-        let mut acct = json!({
+        extend(json!({
             "type": "core",
             "pointer": 0,
             "receiving_id": "",
             "name": "RPC wallet",
             "has_transactions": true, // TODO
-        });
-
-        // extend with data from get_balance()
-        // TODO avoid clone
-        let acct = acct.as_object_mut().req()?;
-        for (k, v) in self._get_balance(0)?.as_object().req()? {
-            acct.insert(k.to_string(), v.clone());
-        }
-        Ok(Value::Object(acct.clone()))
+        }), self._get_balance(0)?)
     }
 
     pub fn get_balance(&self, details: &Value) -> Result<Value, Error> {
@@ -329,6 +322,15 @@ fn btc_to_usat(amount: f64) -> u64 {
 fn btc_to_isat(amount: f64) -> i64 {
     (amount * SAT_PER_BTC) as i64
 }
+
+fn extend(mut dest: Value, mut src: Value) -> Result<Value, Error> {
+    let dest = dest.as_object_mut().req()?;
+    for (k, v) in src.as_object_mut().req()? {
+        dest.insert(k.to_string(), v.take());
+    }
+    Ok(json!(dest))
+}
+
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
