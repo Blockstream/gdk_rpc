@@ -361,6 +361,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         Some(category) => match category.as_str().req()? {
             "send" => "outgoing",
             "receive" => "incoming",
+            "immature" => "incoming",
             _ => bail!("invalid tx category"),
         },
         // gettransaction doesn't have a top-level category,
