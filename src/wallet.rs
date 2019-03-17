@@ -146,7 +146,7 @@ impl Wallet {
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
-        let page = details.get("page").req()?.as_u64().req()? as u32;
+        let page = details.get("page_id").req()?.as_u64().req()? as u32;
         let (txs, potentially_has_more) = self._get_transactions(PER_PAGE, PER_PAGE * page)?;
 
         Ok(json!({
