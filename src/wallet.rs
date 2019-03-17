@@ -237,7 +237,10 @@ impl Wallet {
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
         let tx_hex = details.get("hex").req()?.as_str().req()?;
+        Ok(self.rpc.send_raw_transaction(tx_hex)?)
+    }
 
+    pub fn send_raw_transaction(&self, tx_hex: &String) -> Result<String, Error> {
         Ok(self.rpc.send_raw_transaction(tx_hex)?)
     }
 

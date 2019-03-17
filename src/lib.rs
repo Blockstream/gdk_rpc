@@ -356,6 +356,22 @@ pub extern "C" fn GA_send_transaction(
     ok!(ret, GA_auth_handler::done(json!(txid)))
 }
 
+#[no_mangle]
+pub extern "C" fn GA_broadcast_transaction(
+    sess: *const GA_session,
+    tx_hex: *const c_char,
+    ret: *mut *const c_char,
+) -> i32 {
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get(sess).unwrap();
+    let tx_hex = read_str(tx_hex);
+
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let txid = tryit!(wallet.send_raw_transaction(&tx_hex));
+
+    ok!(ret, make_str(txid))
+}
+
 //
 // Addresses
 //
@@ -735,15 +751,6 @@ pub extern "C" fn GA_set_pin(
     _pin: *const c_char,
     _device_id: *const c_char,
     _ret: *mut *const GA_json,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_broadcast_transaction(
-    _sess: *const GA_session,
-    _tx_hex: *const c_char,
-    _ret: *mut *const c_char,
 ) -> i32 {
     GA_ERROR
 }
