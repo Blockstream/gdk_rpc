@@ -38,7 +38,7 @@ if [ ! -f ${GDK_LOCATION}/build-clang-android-x86/android_x86_ndk.txt ]; then
     if [[ $ARCH_LIST == *"x86_64"* ]]; then
         ./tools/build.sh --ndk x86_64
     fi
-    if [[ $ARCH_LIST == *"x86 "* ]]; then
+    if [[ "${ARCH_LIST/x86_64/}" == *"x86"* ]]; then
         ./tools/build.sh --ndk x86
     fi
     cd $oldpath
@@ -47,7 +47,7 @@ fi
 # FIXME: we shouldn't need to change the crate-type with sed ...
 FEAT="--features android_logger"
 sed -i 's/dylib/staticlib/g' Cargo.toml
-if [[ $ARCH_LIST == *"x86 "* ]]; then
+if [[ "${ARCH_LIST/x86_64/}" == *"x86"* ]]; then
     cargo build $FEAT --target i686-linux-android --release
 fi
 if [[ $ARCH_LIST == *"x86_64"* ]]; then
@@ -70,7 +70,7 @@ cp ${GDK_LOCATION}/include/gdk.h gdk-android-jni/include/gdk
 cp -nrf ${GDK_LOCATION}/build-clang-android-*/libwally-core/src/swig_java/src/com/blockstream/libwally/Wally.java gdk-android-jni/java/com/blockstream/libwally
 cp -nrf ${GDK_LOCATION}/build-clang-android-*/src/swig_java/com/blockstream/libgreenaddress/GDK.java gdk-android-jni/java/com/blockstream/libgreenaddress
 
-if [[ $ARCH_LIST == *"x86 "* ]]; then
+if [[ "${ARCH_LIST/x86_64/}" == *"x86"* ]]; then
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android19-clang -flto -fPIC -shared -o $jni_lib_path/x86/libgreenaddress.so -Wl,--whole-archive target/i686-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-19/arch-x86/usr/lib/liblog.so -Wl,--no-whole-archive  -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android-strip $jni_lib_path/x86/libgreenaddress.so
 
