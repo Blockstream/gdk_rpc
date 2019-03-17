@@ -6,6 +6,11 @@ if [ -f /.dockerenv ]; then
     export GDK_LOCATION=/gdk
     export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 fi
+if [ -z "$ANDROID_NDK" ]; then
+    if have_cmd ndk-build; then
+        export ANDROID_NDK=$(dirname $(command -v ndk-build))
+    fi
+fi
 export PATH=${PATH}:${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin
 
 export CC_i686_linux_android=i686-linux-android19-clang
