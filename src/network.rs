@@ -8,7 +8,7 @@ use std::path::Path;
 
 use crate::errors::OptionExt;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 pub struct Network {
     name: String,
     network: String,
@@ -38,8 +38,8 @@ pub struct Network {
     wamp_cert_roots: Vec<String>,
 }
 
-impl Network {
-    pub fn list() -> HashMap<String, Network> {
+lazy_static! {
+    static ref NETWORKS: HashMap<String, Network> = {
         let mut networks = HashMap::new();
 
         let rpc_url = env::var("BITCOIND_URL")
@@ -112,10 +112,16 @@ impl Network {
         );
 
         networks
+    };
+}
+
+impl Network {
+    pub fn list() -> &'static HashMap<String, Network> {
+        &NETWORKS
     }
 
-    pub fn get(id: &String) -> Option<Network> {
-        Network::list().get(id).cloned()
+    pub fn get(id: &String) -> Option<&'static Network> {
+        NETWORKS.get(id)
     }
 
     pub fn connect(&self) -> Result<Client, Error> {
