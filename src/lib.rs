@@ -508,7 +508,9 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     let sess = sm.get(sess).unwrap();
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let estimates = tryit!(wallet.get_fee_estimates().or_err("fee estimates unavailable"));
+    let estimates = tryit!(wallet
+        .get_fee_estimates()
+        .or_err("fee estimates unavailable"));
 
     ok_json!(ret, estimates)
 }

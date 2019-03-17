@@ -32,7 +32,7 @@ impl Wallet {
             rpc,
             tip: None,
             last_tx: None,
-            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL*2),
+            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
         }
     }
 
@@ -260,8 +260,11 @@ impl Wallet {
     pub fn get_fee_estimates(&self) -> Option<&Value> {
         // will not be available before the first "tick", which should
         // happen as soon as GA_connect initializes the wallet
-        if self.cached_fees.0.is_null() { None }
-        else { Some(&self.cached_fees.0) }
+        if self.cached_fees.0.is_null() {
+            None
+        } else {
+            Some(&self.cached_fees.0)
+        }
     }
     pub fn _make_fee_estimates(&self) -> Result<Value, Error> {
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
