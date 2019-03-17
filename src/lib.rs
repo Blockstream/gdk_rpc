@@ -42,7 +42,7 @@ use std::sync::{Once, ONCE_INIT};
 
 use crate::errors::OptionExt;
 use crate::network::Network;
-use crate::session::{GA_session, SessionManager, spawn_ticker};
+use crate::session::{spawn_ticker, GA_session, SessionManager};
 use crate::wallet::Wallet;
 
 const GA_OK: i32 = 0;
@@ -162,7 +162,6 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 //
 // Session & account management
 //
-//
 
 #[cfg(feature = "android_logger")]
 static INIT_LOGGER: Once = ONCE_INIT;
@@ -182,7 +181,8 @@ pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn GA_destroy_session(sess: *mut GA_session) -> i32 {
-    tryit!(SESS_MANAGER.lock().unwrap().remove(sess));
+    let mut sm = SESS_MANAGER.lock().unwrap();
+    tryit!(sm.remove(sess));
     GA_OK
 }
 

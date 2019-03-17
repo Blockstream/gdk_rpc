@@ -123,7 +123,7 @@ extern "C" {
     fn GA_destroy_json(handler: *const GA_json) -> i32;
     fn GA_destroy_session(handler: *const GA_session) -> i32;
 }
-
+#[allow(non_camel_case_types)]
 struct GA_session_ptr(*mut GA_session);
 unsafe impl Sync for GA_session_ptr {}
 
