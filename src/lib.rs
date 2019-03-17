@@ -704,7 +704,16 @@ pub extern "C" fn GA_get_twofactor_config(
     ret: *mut *const GA_json,
 ) -> i32 {
     // 2FA is always off
-    ok_json!(ret, json!({ "enabled": false }))
+    ok_json!(
+        ret,
+        json!({
+            "any_enabled":false,
+            "all_methods":[],
+            "enabled_methods":[],
+            "limits":{"bits":"0.00","btc":"0.00000000","fiat":"0.00","fiat_currency":"USD","fiat_rate":"0","is_fiat":false,"mbtc":"0.00000","satoshi":0,"ubtc":"0.00"},
+            "twofactor_reset":{"days_remaining":-1,"is_active":false,"is_disputed":false},
+        })
+    )
 }
 
 #[no_mangle]
