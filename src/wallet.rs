@@ -416,13 +416,18 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 fn make_output(desc: &Value) -> Result<TxOut, Error> {
     debug!("make_output {:?}", desc);
 
-    let dest = desc.get("address").req()?.as_str().req()?.to_string();
-    let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(0);
+    let mut dest = desc.get("address").req()?.as_str().req()?;
+    let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(100000);
 
     debug!("make_output dest: {}, value: {}", dest, value);
 
-    // TODO: dest could also be a BIP 21 URI with amount
-    let address = Address::from_str(&dest)?;
+    if dest.to_lowercase().starts_with("bitcoin:") {
+        dest = dest.split(":").nth(1).req()?;
+        debug!("make_output dest --> {}", dest);
+    }
+    // TODO: support BIP21 amount
+
+    let address = Address::from_str(dest)?;
     debug!("make_output address: {:?}", address);
 
     Ok(TxOut {
