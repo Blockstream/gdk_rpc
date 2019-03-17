@@ -408,7 +408,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
 fn make_output(desc: &Value) -> Result<TxOut, Error> {
     let dest = desc.get("address").req()?.as_str().req()?.to_string();
-    let value = desc.get("satoshi").req()?.as_u64().req()?;
+    let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(0);
 
     // TODO: dest could also be a BIP 21 URI with amount
     let address = Address::from_str(&dest)?;
