@@ -196,6 +196,7 @@ impl Wallet {
 
         // XXX use createrawtx?
         let addresses: &Vec<Value> = details.get("addresses").req()?.as_array().req()?;
+        debug!("create_transaction() addresses: {:?}", addresses);
 
         let tx = Transaction {
             version: 2,
