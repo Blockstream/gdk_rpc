@@ -167,7 +167,6 @@ impl Wallet {
         // fetch full transactions and convert to GDK format
         let txs = txdescs
             .into_iter()
-            .filter(|txdesc| txdesc.get("category").unwrap().as_str().unwrap() != "immature")
             .map(|txdesc| {
                 let txid = Sha256dHash::from_hex(txdesc.get("txid").unwrap().as_str().unwrap())?;
                 let blockhash = txdesc
