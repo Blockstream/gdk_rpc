@@ -120,8 +120,9 @@ extern "C" {
     fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
 
     fn GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
-    fn GA_destroy_json(handler: *const GA_json) -> i32;
-    fn GA_destroy_session(handler: *const GA_session) -> i32;
+    fn GA_destroy_json(json: *const GA_json) -> i32;
+    fn GA_destroy_session(sess: *const GA_session) -> i32;
+    fn GA_destroy_string(s: *const c_char) -> i32;
 }
 #[allow(non_camel_case_types)]
 struct GA_session_ptr(*mut GA_session);
@@ -317,6 +318,14 @@ fn a6_test_mnemonic() {
     });
     info!("mnemonic is valid: {}", is_valid);
     assert_eq!(GA_TRUE, is_valid);
+}
+
+#[test]
+fn a6_test_destroy_string() {
+    let mut mnemonic: *const c_char = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic) });
+
+    assert_eq!(GA_OK, unsafe { GA_destroy_string(mnemonic) });
 }
 
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
