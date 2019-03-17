@@ -30,11 +30,14 @@ if [ ! -f ${GDK_LOCATION}/build-clang-android-x86/android_x86_ndk.txt ]; then
     cd $oldpath
 fi
 
+# FIXME: we shouldn't need to change the crate-type with sed ...
 FEAT="--features android_logger"
-cargo build $FEAT --target i686-linux-android --release
-cargo build $FEAT --target x86_64-linux-android --release
-cargo build $FEAT --target armv7-linux-androideabi --release
-cargo build $FEAT --target aarch64-linux-android --release
+sed -i 's/dylib/staticlib/g' Cargo.toml
+cargo build $FEAT --target i686-linux-android --release --crate-type "staticlib"
+cargo build $FEAT --target x86_64-linux-android --release --crate-type "staticlib"
+cargo build $FEAT --target armv7-linux-androideabi --release --crate-type "staticlib"
+cargo build $FEAT --target aarch64-linux-android --release --crate-type "staticlib"
+sed -i 's/staticlib/dylib/g' Cargo.toml
 
 
 jni_lib_path=gdk-android-jni/lib
