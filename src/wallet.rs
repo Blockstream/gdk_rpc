@@ -79,10 +79,7 @@ impl Wallet {
     }
 
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
-        // always report network and fees
-        let mut msgs = vec![
-            json!({ "event": "network", "network": { "connected": true, "limit": true, "waiting": 0, "elapsed": 0 } }),
-        ];
+        let mut msgs = vec![];
 
         // check for new blocks
         let tip = self.rpc.get_best_block_hash()?;
