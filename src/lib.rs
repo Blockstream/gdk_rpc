@@ -635,6 +635,14 @@ pub extern "C" fn GA_reconnect_hint(_sess: *const GA_session, _hint: *const GA_j
     GA_OK
 }
 
+#[no_mangle]
+pub extern "C" fn GA_get_watch_only_username(
+    _sess: *mut GA_session,
+    ret: *mut *const c_char,
+) -> i32 {
+    ok!(ret, make_str("".to_string()))
+}
+
 //
 // Unimplemented and GA_ERROR's
 //
@@ -664,14 +672,6 @@ pub extern "C" fn GA_set_watch_only(
     _sess: *mut GA_session,
     _username: *const c_char,
     _password: *const c_char,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_get_watch_only_username(
-    _sess: *mut GA_session,
-    _ret: *mut *const c_char,
 ) -> i32 {
     GA_ERROR
 }
