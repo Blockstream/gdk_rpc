@@ -131,9 +131,15 @@ macro_rules! ok_json {
 
 #[no_mangle]
 pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
-    ok_json!(ret, json!({ "all_networks": Network::list() }))
-}
+    let networks = Network::list();
+    let names: Vec<String> = networks.keys().cloned().collect();
 
+    let mut networks = json!(networks);
+    let mut networks = networks.as_object_mut().unwrap();
+    networks.insert("all_networks".to_string(), json!(names));
+
+    ok_json!(ret, networks)
+}
 //
 // Session & account management
 //
