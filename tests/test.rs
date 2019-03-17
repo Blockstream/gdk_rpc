@@ -296,7 +296,7 @@ fn a4_test_settings() {
 
     let mut settings: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_settings(SESS.0, &mut settings) });
-    let mut settings = read_json(settings);
+    let settings = read_json(settings);
     debug!("get settings again: {:#?}\n", settings);
     assert_eq!(settings.get("unit").unwrap().as_str().unwrap(), "satoshi");
 }
