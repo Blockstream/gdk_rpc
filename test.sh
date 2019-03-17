@@ -11,6 +11,4 @@ bitcoin-cli -regtest -rpcwait generate 102
 
 cargo test --features stderr_logger --all  -- --test-threads=1
 
-gcc -o test test.c -Isrc  -L. -l:target/release/libgdk_rpc.so && ./test
-
 bitcoin-cli -regtest stop
