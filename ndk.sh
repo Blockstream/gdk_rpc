@@ -30,8 +30,6 @@ if [ ! -f ${GDK_LOCATION}/build-clang-android-x86/android_x86_ndk.txt ]; then
     cd $oldpath
 fi
 
-cp cargo-config.toml ~/.cargo/config
-
 FEAT="--features android_logger"
 cargo build $FEAT --target i686-linux-android --release
 cargo build $FEAT --target x86_64-linux-android --release
