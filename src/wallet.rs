@@ -408,6 +408,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "fee_rate": (fee as f64)/(vsize as f64),
 
         "addresses": [],
+        "addressees": [], // expected to be received with a typo by some wallet software
         "inputs": [], // tx.input.iter().map(format_gdk_input).collect(),
         "outputs": [], //tx.output.iter().map(format_gdk_output).collect(),
     }))
