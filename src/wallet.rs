@@ -227,9 +227,13 @@ impl Wallet {
         // make sure "hex" is available, fail otherwise
         funded_tx.get("hex").req()?;
 
-        // XXX reusing bitcoind's format for now (an object with "hex", "fee" and "changepos"),
-        // might require some adjustments for GA apps compatibility
-        Ok(funded_tx)
+        let mut res = funded_tx;
+        // an empty "error" is required to indicate success
+        res.as_object_mut()
+            .req()?
+            .insert("error".to_string(), json!(""));
+
+        Ok(res)
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<Value, Error> {
@@ -246,9 +250,13 @@ impl Wallet {
             bail!("the transaction cannot be signed: {}", errors)
         }
 
-        // XXX reusing bitcoind's format for now (an object with "hex", "fee" and "changepos"),
-        // might require some adjustments for GA apps compatibility
-        Ok(signed_tx)
+        let mut res = signed_tx;
+        // an empty "error" is required to indicate success
+        res.as_object_mut()
+            .req()?
+            .insert("error".to_string(), json!(""));
+
+        Ok(res)
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
