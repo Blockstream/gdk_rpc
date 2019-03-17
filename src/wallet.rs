@@ -163,7 +163,7 @@ impl Wallet {
             &[json!("*"), json!(limit), json!(start)],
         )?;
         let txdescs = txdescs.as_array().unwrap();
-        let potentially_has_more = txdescs.len() as u32 == PER_PAGE;
+        let potentially_has_more = txdescs.len() as u32 == limit;
 
         // fetch full transactions and convert to GDK format
         let txs = txdescs
