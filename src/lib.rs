@@ -30,6 +30,7 @@ pub mod network;
 pub mod session;
 pub mod util;
 pub mod wallet;
+pub mod settings;
 
 use serde_json::Value;
 
@@ -548,6 +549,17 @@ pub extern "C" fn GA_set_notification_handler(
 }
 
 //
+// Settings
+//
+
+#[no_mangle]
+pub extern "C" fn GA_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get(sess).unwrap();
+    ok_json!(ret, json!(sess.settings))
+}
+
+//
 // JSON utilities
 //
 
@@ -811,11 +823,6 @@ pub extern "C" fn GA_change_settings(
     _settings: *const GA_json,
     _ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_get_settings(_sess: *const GA_session, _ret: *mut *const GA_json) -> i32 {
     GA_ERROR
 }
 

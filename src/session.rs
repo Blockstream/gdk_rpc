@@ -7,12 +7,14 @@ use std::time::Duration;
 use failure::Error;
 use serde_json::Value;
 
+use crate::settings::Settings;
 use crate::wallet::Wallet;
 use crate::GA_json;
 
 #[derive(Debug)]
 #[repr(C)]
 pub struct GA_session {
+    pub settings: Settings,
     pub network: Option<String>,
     pub wallet: Option<Wallet>,
     pub mnemonic: Option<String>, // XXX plain text
@@ -25,6 +27,7 @@ pub struct GA_session {
 impl GA_session {
     fn new() -> *mut GA_session {
         let sess = GA_session {
+            settings: Settings::default(),
             network: None,
             wallet: None,
             mnemonic: None,

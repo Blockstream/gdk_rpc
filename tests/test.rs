@@ -56,6 +56,8 @@ extern "C" {
     fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32;
     fn GA_validate_mnemonic(mnemonic: *const c_char, ret: &mut u32) -> i32;
 
+    fn GA_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+
     fn GA_get_receive_address(
         sess: *const GA_session,
         subaccount: u32,
@@ -268,6 +270,15 @@ fn a4_test_get_address() {
         GA_get_receive_address(SESS.0, 0, &mut recv_addr)
     });
     debug!("recv addr: {:#?}\n", read_str(recv_addr));
+}
+
+#[test]
+fn a4_test_settings() {
+    let mut settings: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_settings(SESS.0, &mut settings)
+    });
+    debug!("get settings: {:#?}\n", read_json(settings));
 }
 
 #[test]
