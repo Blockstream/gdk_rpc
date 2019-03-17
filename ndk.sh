@@ -75,6 +75,7 @@ if [[ "${ARCH_LIST/x86_64/}" == *"x86"* ]]; then
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android-strip $jni_lib_path/x86/libgreenaddress.so
 
 fi
+
 if [[ $ARCH_LIST == *"x86_64"* ]]; then
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang -flto -fPIC -shared -o $jni_lib_path/x86_64/libgreenaddress.so -Wl,--whole-archive target/x86_64-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86_64/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-21/arch-x86_64/usr/lib64/liblog.so -Wl,--no-whole-archive  -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-strip $jni_lib_path/x86_64/libgreenaddress.so
