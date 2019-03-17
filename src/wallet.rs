@@ -417,7 +417,10 @@ fn make_output(desc: &Value) -> Result<TxOut, Error> {
     debug!("make_output {:?}", desc);
 
     let mut dest = desc.get("address").req()?.as_str().req()?;
-    let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(100000);
+    let value = desc
+        .get("satoshi")
+        .and_then(|s| s.as_u64())
+        .unwrap_or(100000);
 
     debug!("make_output dest: {}, value: {}", dest, value);
 
