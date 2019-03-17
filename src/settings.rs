@@ -23,7 +23,7 @@ impl Settings {
             },
             required_num_blocks: 2, // XXX
             sound: false,
-            altimeout: 5, // XXX
+            altimeout: 5,
         }
     }
 }

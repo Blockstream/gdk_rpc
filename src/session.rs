@@ -49,7 +49,7 @@ impl GA_session {
         Ok(())
     }
 
-    fn notify(&self, data: Value) {
+    pub fn notify(&self, data: Value) {
         debug!("push notification: {:?}", data);
         if let Some((handler, context)) = self.notify {
             handler(context, GA_json::new(data));
