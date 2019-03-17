@@ -339,7 +339,10 @@ pub extern "C" fn GA_sign_transaction(
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let tx_signed = tryit!(wallet.sign_transaction(&tx_detail_unsigned));
 
-    ok!(ret, GA_auth_handler::done(json!({ "error": "", "hex": tx_signed })))
+    ok!(
+        ret,
+        GA_auth_handler::done(json!({ "error": "", "hex": tx_signed }))
+    )
 }
 
 #[no_mangle]
@@ -355,7 +358,10 @@ pub extern "C" fn GA_send_transaction(
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let txid = tryit!(wallet.send_transaction(&tx_detail_signed));
 
-    ok!(ret, GA_auth_handler::done(json!({ "error": "", "txid": txid })))
+    ok!(
+        ret,
+        GA_auth_handler::done(json!({ "error": "", "txid": txid }))
+    )
 }
 
 #[no_mangle]
