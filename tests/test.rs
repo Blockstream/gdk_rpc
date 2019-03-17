@@ -15,6 +15,7 @@ use std::os::raw::c_char;
 
 const GA_OK: i32 = 0;
 const GA_TRUE: u32 = 1;
+const GA_FALSE: u32 = 0;
 
 #[repr(C)]
 pub struct GA_json {
@@ -357,13 +358,21 @@ fn a6_test_mnemonic() {
     let mnemonic = read_str(mnemonic);
     info!("generated mnemonic: {}", mnemonic);
 
-    let mnemonic = CString::new(mnemonic).unwrap();
+    let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
     let mut is_valid = 0;
     assert_eq!(GA_OK, unsafe {
-        GA_validate_mnemonic(mnemonic.as_ptr(), &mut is_valid)
+        GA_validate_mnemonic(mnemonic_c.as_ptr(), &mut is_valid)
     });
     info!("mnemonic is valid: {}", is_valid);
     assert_eq!(GA_TRUE, is_valid);
+
+    let mnemonic_c = CString::new(mnemonic + "invalid").unwrap();
+    let mut is_valid = 0;
+    assert_eq!(GA_OK, unsafe {
+        GA_validate_mnemonic(mnemonic_c.as_ptr(), &mut is_valid)
+    });
+    info!("invalid mnemonic is valid: {}", is_valid);
+    assert_eq!(GA_FALSE, is_valid);
 }
 
 #[test]
