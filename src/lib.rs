@@ -594,7 +594,7 @@ pub extern "C" fn GA_convert_json_to_string(json: *const GA_json, ret: *mut *con
 #[no_mangle]
 pub extern "C" fn GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
     let jstr = read_str(jstr);
-    let json: Value = serde_json::from_str(&jstr).expect("invalid json for string_to_json");
+    let json: Value = tryit!(serde_json::from_str(&jstr));
     ok_json!(ret, json)
 }
 
@@ -606,7 +606,10 @@ pub extern "C" fn GA_convert_json_value_to_string(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = json.get(&path).expect("path missing").to_string();
+    let res = tryit!(json
+        .get(&path)
+        .map(|x| x.to_string())
+        .or_err("missing path"));
     ok!(ret, make_str(res))
 }
 
@@ -618,11 +621,11 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = json
+    let res = tryit!(json
         .get(&path)
-        .expect("path missing")
-        .as_u64()
-        .expect("invalid number") as u32;
+        .and_then(|x| x.as_u64())
+        .map(|x| x as u32)
+        .or_err("invalid number"));
     ok!(ret, res)
 }
 
@@ -634,11 +637,10 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = json
+    let res = tryit!(json
         .get(&path)
-        .expect("path missing")
-        .as_u64()
-        .expect("invalid number");
+        .and_then(|x| x.as_u64())
+        .or_err("invalid number"));
     ok!(ret, res)
 }
 
@@ -650,8 +652,11 @@ pub extern "C" fn GA_convert_json_value_to_json(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let jstr = json.get(&path).expect("path missing").to_string();
-    let res: Value = serde_json::from_str(&jstr).expect("invaliud json for json_value_to_json");
+    let jstr = tryit!(json
+        .get(&path)
+        .map(|x| x.to_string())
+        .or_err("missing path"));
+    let res: Value = tryit!(serde_json::from_str(&jstr));
     ok_json!(ret, res)
 }
 
