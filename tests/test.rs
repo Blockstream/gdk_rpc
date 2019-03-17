@@ -241,7 +241,7 @@ fn a4_test_estimates() {
 }
 
 #[test]
-fn a4_test_account() {
+fn a4_test_subaccount() {
     let mut subaccounts: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GA_get_subaccounts(SESS.0, &mut subaccounts)
