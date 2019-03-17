@@ -81,8 +81,7 @@ impl Wallet {
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
         // always report network and fees
         let mut msgs = vec![
-            //{"event":"network","network":{"connected":false,"elapsed":1091312175736,"limit":true,"waiting":0}}
-            json!({ "event": "network", "network": { "connected": true, limit: true, waiting: 0, elapsed: 0 } }),
+            json!({ "event": "network", "network": { "connected": true, "limit": true, "waiting": 0, "elapsed": 0 } }),
         ];
 
         // check for new blocks
