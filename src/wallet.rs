@@ -113,13 +113,16 @@ impl Wallet {
             bail!("multi-account is unsupported");
         }
 
-        extend(json!({
-            "type": "core",
-            "pointer": 0,
-            "receiving_id": "",
-            "name": "RPC wallet",
-            "has_transactions": true, // TODO
-        }), self._get_balance(0)?)
+        extend(
+            json!({
+                "type": "core",
+                "pointer": 0,
+                "receiving_id": "",
+                "name": "RPC wallet",
+                "has_transactions": true, // TODO
+            }),
+            self._get_balance(0)?,
+        )
     }
 
     pub fn get_balance(&self, details: &Value) -> Result<Value, Error> {
