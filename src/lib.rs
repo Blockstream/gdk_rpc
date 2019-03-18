@@ -214,12 +214,12 @@ pub extern "C" fn GA_register_user(
 ) -> i32 {
     println!("GA_register_user1()");
     let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
 
-    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.register(&mnemonic));
 
     ok!(ret, GA_auth_handler::success())
@@ -244,10 +244,8 @@ pub extern "C" fn GA_login(
 
     debug!("GA_login({}) {:?}", mnemonic, sess);
 
-    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
-
-    sess.mnemonic = Some(mnemonic);
 
     sess.notify(json!({ "event": "settings", "settings": sess.settings }));
 
@@ -463,8 +461,9 @@ pub extern "C" fn GA_get_mnemonic_passphrase(
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
-    let mnemonic = tryit!(sess.mnemonic.clone().or_err("mnemonic unavailable"));
+    let mnemonic = tryit!(wallet.mnemonic().or_err("mnemonic unavailable"));
 
     ok!(ret, make_str(mnemonic))
 }
@@ -754,13 +753,12 @@ pub extern "C" fn GA_login_with_pin(
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
-    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
     let pin_data = &unsafe { &*pin_data }.0;
     let mnemonic = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
 
-    wallet.login(&mnemonic);
-    sess.mnemonic = Some(mnemonic);
+    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
+    tryit!(wallet.login(&mnemonic));
 
     GA_OK
 }

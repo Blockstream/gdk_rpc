@@ -17,7 +17,6 @@ pub struct GA_session {
     pub settings: Settings,
     pub network: Option<String>,
     pub wallet: Option<Wallet>,
-    pub mnemonic: Option<String>, // XXX plain text
     pub notify: Option<(
         extern "C" fn(*const libc::c_void, *const GA_json),
         *const libc::c_void,
@@ -30,7 +29,6 @@ impl GA_session {
             settings: Settings::default(),
             network: None,
             wallet: None,
-            mnemonic: None,
             notify: None,
         };
         unsafe { transmute(Box::new(sess)) }
@@ -38,6 +36,10 @@ impl GA_session {
 
     pub fn wallet(&self) -> Option<&Wallet> {
         self.wallet.as_ref()
+    }
+
+    pub fn wallet_mut(&mut self) -> Option<&mut Wallet> {
+        self.wallet.as_mut()
     }
 
     pub fn tick(&mut self) -> Result<(), Error> {

@@ -21,6 +21,7 @@ const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
 pub struct Wallet {
     rpc: RpcClient,
+    mnemonic: Option<String>,
     tip: Option<Sha256dHash>,
     last_tx: Option<Sha256dHash>,
     cached_fees: (Value, Instant),
@@ -30,13 +31,14 @@ impl Wallet {
     pub fn new(rpc: RpcClient) -> Self {
         Wallet {
             rpc,
+            mnemonic: None,
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
         }
     }
 
-    pub fn register(&self, mnemonic: &String) -> Result<(), Error> {
+    pub fn register(&mut self, mnemonic: &String) -> Result<(), Error> {
         let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
         let seed = Seed::new(&mnem, "");
 
@@ -57,9 +59,9 @@ impl Wallet {
         let res: Result<Value, CoreError> = self.rpc.call("sethdseed", &args);
 
         match res {
-            Ok(_) => Ok(()),
+            Ok(_) => (),
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
-            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => Ok(()),
+            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => (),
             Err(CoreError::JsonRpc(jsonrpc::error::Error::Rpc(rpc_error))) => {
                 if rpc_error.code != -5
                     || rpc_error.message
@@ -67,15 +69,21 @@ impl Wallet {
                 {
                     bail!("{:?}", rpc_error)
                 }
-                Ok(())
             }
             Err(err) => bail!(err),
-        }
+        };
+
+        self.mnemonic = Some(mnemonic.clone());
+        Ok(())
     }
 
-    pub fn login(&self, mnemonic: &String) -> Result<(), Error> {
+    pub fn login(&mut self, mnemonic: &String) -> Result<(), Error> {
         // just as pass-through to register for now
         self.register(mnemonic)
+    }
+
+    pub fn mnemonic(&self) -> Option<String> {
+        self.mnemonic.clone()
     }
 
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
