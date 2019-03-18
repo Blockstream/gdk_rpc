@@ -320,7 +320,7 @@ impl Wallet {
 
             "fiat_rate": (exchange_rate).to_string(),
             "fiat_currency": currency,
-            "fiat": (amount_f * exchange_rate).to_string(),
+            "fiat": (amount_f / SAT_PER_BTC * exchange_rate).to_string(),
         })
     }
 
