@@ -120,6 +120,13 @@ extern "C" {
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
+    fn GA_set_transaction_memo(
+        sess: *const GA_session,
+        txid: *const c_char,
+        memo: *const c_char,
+        memo_type: u32,
+    ) -> i32;
+
     fn GA_set_pin(
         sess: *const GA_session,
         mnemonic: *const c_char,
@@ -363,6 +370,18 @@ fn a4_send_tx() {
         GA_get_transaction_details(SESS.0, txid.as_ptr(), &mut loaded_tx)
     });
     info!("loaded broadcasted tx: {:#?}", read_json(loaded_tx));
+
+    let memo = CString::new("hello world").unwrap();
+    assert_eq!(GA_OK, unsafe {
+        GA_set_transaction_memo(SESS.0, txid.as_ptr(), memo.as_ptr(), 0)
+    });
+    debug!("set memo");
+
+    let mut loaded_tx: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_transaction_details(SESS.0, txid.as_ptr(), &mut loaded_tx)
+    });
+    info!("loaded tx with memo: {:?}", read_json(loaded_tx));
 }
 
 #[test]

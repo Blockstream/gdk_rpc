@@ -42,7 +42,7 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
-use crate::constants::{GA_ERROR, GA_FALSE, GA_OK, GA_TRUE};
+use crate::constants::{GA_ERROR, GA_FALSE, GA_MEMO_USER, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
@@ -304,6 +304,30 @@ pub extern "C" fn GA_get_balance(
     let balance = tryit!(wallet.get_balance(&details));
 
     ok_json!(ret, balance)
+}
+
+#[no_mangle]
+pub extern "C" fn GA_set_transaction_memo(
+    sess: *const GA_session,
+    txid: *const c_char,
+    memo: *const c_char,
+    memo_type: u32,
+) -> i32 {
+    if memo_type != GA_MEMO_USER {
+        warn!("unsupported memo type");
+        return GA_ERROR;
+    }
+
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get(sess).unwrap();
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+
+    let txid = read_str(txid);
+    let memo = read_str(memo);
+
+    tryit!(wallet.set_tx_memo(&txid, &memo[..]));
+
+    GA_OK
 }
 
 //
@@ -870,16 +894,6 @@ pub extern "C" fn GA_get_unspent_outputs_for_private_key(
 
 #[no_mangle]
 pub extern "C" fn GA_send_nlocktimes(_sess: *const GA_session) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_set_transaction_memo(
-    _sess: *const GA_session,
-    _txid: *const c_char,
-    _memo: *const c_char,
-    _memo_type: u32,
-) -> i32 {
     GA_ERROR
 }
 

@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
-use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc, f64_from_val};
+use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -306,6 +306,43 @@ impl Wallet {
         Ok(self._convert_satoshi(satoshi))
     }
 
+    pub fn set_tx_memo(&self, txid: &String, memo: &str) -> Result<(), Error> {
+        // we can't really set a tx memo, so we fake it by setting a memo on the address
+
+        let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
+        debug!(
+            "set_tx_memo() for {}, memo={}, txdesc={:?}",
+            txid, memo, txdesc
+        );
+
+        let address = txdesc["details"][0]["address"]
+            .as_str()
+            .or_err("cannot find address to attach memo")?;
+        debug!("set_tx_memo() use address {}", address);
+
+        let address_info: Value = self.rpc.call("getaddressinfo", &[json!(address)])?;
+        debug!("set_tx_memo() address info {:?}", address_info);
+        let curr_label = address_info["label"].as_str().unwrap_or("");
+
+        let new_label = if memo.starts_with(curr_label) {
+            memo.to_string()
+        } else {
+            format!("{}, {}", curr_label, memo)
+        };
+
+        debug!("set_tx_memo() change label {} => {}", curr_label, new_label);
+
+        Ok(match self
+            .rpc
+            .call::<Value>("setlabel", &[json!(address), json!(new_label)])
+        {
+            Ok(_) => Ok(()),
+            // https://github.com/apoelstra/rust-jsonrpc/pull/16
+            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => Ok(()),
+            Err(err) => Err(Error::from(err)),
+        }?)
+    }
+
     fn _convert_satoshi(&self, amount: u64) -> Value {
         let currency = "USD"; // TODO
         let exchange_rate = self.exchange_rate(currency);
@@ -380,12 +417,27 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         }
     };
 
+    // read out from the "label" field if available,
+    // or fallback to concating the labels for all the "details" items together
+    let memo = txdesc["label"]
+        .as_str()
+        .map(|l| l.to_string())
+        .or_else(|| {
+            txdesc["details"].as_array().map(|ds| {
+                ds.iter()
+                    .filter_map(|d| d["label"].as_str())
+                    .collect::<Vec<&str>>()
+                    .join(", ")
+            })
+        })
+        .unwrap_or("".to_string());
+
     Ok(json!({
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
         "created_at": fmt_time(txdesc["time"].as_u64().req()?),
 
         "type": type_str,
-        "memo": txdesc["label"].as_str().unwrap_or(""),
+        "memo": memo,
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
