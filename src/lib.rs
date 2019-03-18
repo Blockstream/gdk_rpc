@@ -726,21 +726,38 @@ pub extern "C" fn GA_get_watch_only_username(
 #[no_mangle]
 pub extern "C" fn GA_set_pin(
     _sess: *const GA_session,
-    _mnemonic: *const c_char,
+    mnemonic: *const c_char,
     _pin: *const c_char,
     _device_id: *const c_char,
     ret: *mut *const GA_json,
 ) -> i32 {
+    let mnemonic = read_str(mnemonic);
+
     // FIXME setting a PIN does not actually do anything, just a successful no-op
-    ok_json!(ret, {})
+    ok_json!(ret, json!({
+        "encrypted_data": mnemonic,
+        "salt": "",
+        "pin_identifier": "",
+        "__unencrypted": true
+    }))
 }
 
 #[no_mangle]
 pub extern "C" fn GA_login_with_pin(
-    _sess: *mut GA_session,
+    sess: *mut GA_session,
     _pin: *const c_char,
-    _pin_data: *const GA_json,
+    pin_data: *const GA_json,
 ) -> i32 {
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get_mut(sess).unwrap();
+    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
+
+    let pin_data = &unsafe { &*pin_data }.0;
+    let mnemonic = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
+
+    wallet.login(&mnemonic);
+    sess.mnemonic = Some(mnemonic);
+
     GA_OK
 }
 
