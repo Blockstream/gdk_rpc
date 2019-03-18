@@ -757,6 +757,7 @@ pub extern "C" fn GA_login_with_pin(
     let pin_data = &unsafe { &*pin_data }.0;
     let mnemonic_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
     let mnemonic = tryit!(hex_to_mnemonic(&mnemonic_hex));
+    debug!("GA_login_with_pin mnemonic: {}", mnemonic);
 
     let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));

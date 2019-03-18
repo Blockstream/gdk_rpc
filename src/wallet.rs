@@ -341,11 +341,8 @@ pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
 }
 
 pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
-    debug!("hex_to_mnemonic({})", hex);
     let bytes = hex::decode(hex)?;
-    debug!("hex_to_mnemonic bytes: {:?}", bytes);
     let mnem = Mnemonic::from_entropy(&bytes, Language::English)?;
-    debug!("hex_to_mnemonic mnem: {:?}", mnem);
     Ok(mnem.into_phrase())
 }
 

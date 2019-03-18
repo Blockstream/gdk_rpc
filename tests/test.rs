@@ -128,6 +128,12 @@ extern "C" {
         device_id: *const c_char,
         ret: *mut *const GA_json,
     ) -> i32;
+    fn GA_login_with_pin(
+        sess: *const GA_session,
+        device_id: *const c_char,
+        pin_data: *const GA_json,
+    ) -> i32;
+
 
     fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
         -> i32;
@@ -351,6 +357,7 @@ fn a4_send_tx() {
 fn a5_test_pin() {
     let mnemonic =
         "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
+
     let mnemonic = CString::new(mnemonic).unwrap();
     let pin = CString::new("1234").unwrap();
     let device_id = CString::new("foo").unwrap();
@@ -365,8 +372,16 @@ fn a5_test_pin() {
         )
     });
     let pin_data = read_json(pin_data);
-
     debug!("pin data: {:?}", pin_data);
+
+    let pin_data = make_json(pin_data);
+    assert_eq!(GA_OK, unsafe {
+        GA_login_with_pin(
+            SESS.0,
+            pin.as_ptr(),
+            pin_data,
+        )
+    });
 }
 
 #[test]
