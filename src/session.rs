@@ -51,6 +51,12 @@ impl GA_session {
         Ok(())
     }
 
+    // called when the wallet is initialized and logged in
+    pub fn hello(&mut self) -> Result<(), Error> {
+        self.notify(json!({ "event": "settings", "settings": self.settings }));
+        self.tick()
+    }
+
     pub fn notify(&self, data: Value) {
         debug!("push notification: {:?}", data);
         if let Some((handler, context)) = self.notify {

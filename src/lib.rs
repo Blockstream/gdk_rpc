@@ -245,8 +245,7 @@ pub extern "C" fn GA_login(
     let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
 
-    sess.notify(json!({ "event": "settings", "settings": sess.settings }));
-    tryit!(sess.tick());
+    tryit!(sess.hello());
 
     ok!(ret, GA_auth_handler::success())
 }
@@ -762,8 +761,7 @@ pub extern "C" fn GA_login_with_pin(
     let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
 
-    sess.notify(json!({ "event": "settings", "settings": sess.settings }));
-    tryit!(sess.tick());
+    tryit!(sess.hello());
 
     GA_OK
 }
