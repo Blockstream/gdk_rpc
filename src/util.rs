@@ -34,6 +34,10 @@ pub fn btc_to_isat(amount: f64) -> i64 {
     (amount * SAT_PER_BTC) as i64
 }
 
+pub fn usat_to_fbtc(sat: u64) -> f64 {
+    (sat as f64) / SAT_PER_BTC
+}
+
 pub fn extend(mut dest: Value, mut src: Value) -> Result<Value, Error> {
     let dest = dest.as_object_mut().req()?;
     for (k, v) in src.as_object_mut().req()? {

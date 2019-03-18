@@ -1,10 +1,10 @@
 use hex;
+use std::collections::HashMap;
 use std::fmt;
-use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
-use bitcoin::{consensus::serialize, Address, Network as BNetwork, PrivateKey, Transaction, TxOut};
+use bitcoin::{consensus::serialize, Network as BNetwork, PrivateKey, Transaction};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
-use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time};
+use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -194,33 +194,20 @@ impl Wallet {
         debug!("create_transaction(): {:?}", details);
 
         // XXX use createrawtx?
-        let addresses: &Vec<Value> = details
-            .get("addresses")
-            // some software is sending this with a typo
-            .or_else(|| details.get("addressees"))
-            .req()?
-            .as_array()
-            .req()?;
-        debug!("create_transaction() addresses: {:?}", addresses);
+        let outs = parse_addresses(&details)?;
+        debug!("create_transaction() addresses: {:?}", outs);
 
-        let tx = Transaction {
-            version: 2,
-            lock_time: 0, // anti fee snipping?
-            input: vec![],
-            output: addresses
-                .iter()
-                .map(make_output)
-                .collect::<Result<Vec<TxOut>, Error>>()?,
-        };
+        let tx = self
+            .rpc
+            .create_raw_transaction_hex(&[], Some(&outs), None, None)?;
+
         debug!("create_transaction tx: {:?}", tx);
 
         // TODO explicit handling for id_no_utxos_found id_no_recipients id_insufficient_funds
         // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
 
-        let funded_tx: Value = self
-            .rpc
-            .call("fundrawtransaction", &[json!(hex::encode(serialize(&tx)))])?;
+        let funded_tx: Value = self.rpc.call("fundrawtransaction", &[json!(tx)])?;
 
         debug!("create_transaction funded_tx: {:?}", funded_tx);
 
@@ -407,28 +394,33 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     }))
 }
 
-fn make_output(desc: &Value) -> Result<TxOut, Error> {
-    debug!("make_output {:?}", desc);
+fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
+    debug!("parse_addresses {:?}", details);
 
-    let mut dest = desc.get("address").req()?.as_str().req()?;
-    let value = desc
-        .get("satoshi")
-        .and_then(|s| s.as_u64())
-        .unwrap_or(100000);
+    Ok(details
+        .get("addresses")
+        // some software is sending this with a typo
+        .or_else(|| details.get("addressees"))
+        .req()?
+        .as_array()
+        .req()?
+        .iter()
+        .map(|desc| {
+            let mut address = desc.get("address").req()?.as_str().req()?;
+            let value = desc
+                .get("satoshi")
+                .and_then(|s| s.as_u64())
+                .unwrap_or(100000); // XXX -- this is needed because fundrawtx won't accept it otherwise, but is dangerous
 
-    debug!("make_output dest: {}, value: {}", dest, value);
+            debug!("make_output dest: {}, value: {}", address, value);
 
-    if dest.to_lowercase().starts_with("bitcoin:") {
-        dest = dest.split(":").nth(1).req()?;
-        debug!("make_output dest --> {}", dest);
-    }
-    // TODO: support BIP21 amount
+            if address.to_lowercase().starts_with("bitcoin:") {
+                address = address.split(":").nth(1).req()?;
+                debug!("make_output dest --> {}", address);
+            }
+            // TODO: support BIP21 amount
 
-    let address = Address::from_str(dest)?;
-    debug!("make_output address: {:?}", address);
-
-    Ok(TxOut {
-        value,
-        script_pubkey: address.script_pubkey(),
-    })
+            Ok((address.to_string(), usat_to_fbtc(value)))
+        })
+        .collect::<Result<HashMap<String, f64>, Error>>()?)
 }
