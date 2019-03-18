@@ -46,9 +46,10 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_MEMO_USER, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{log_filter, make_str, read_str};
+use crate::util::{extend, log_filter, make_str, read_str};
 use crate::wallet::{
-    generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
+    format_addressees, generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic,
+    Wallet,
 };
 
 lazy_static! {
@@ -348,9 +349,9 @@ pub extern "C" fn GA_create_transaction(
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
-    // we need to echo "addressees" back, so that the output of GA_create_transaction
-    // can be beed back into it as input
-    let addressees = &details["addressees"];
+    // we need to echo "addressees" back (with some extra fields), so that the
+    // output of GA_create_transactio could be beed back into it as input.
+    let addressees = tryit!(format_addressees(&details["addressees"]));
 
     let tx_unsigned = match wallet.create_transaction(&details) {
         Err(err) => {

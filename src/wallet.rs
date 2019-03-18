@@ -478,3 +478,24 @@ fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
         })
         .collect::<Result<HashMap<String, f64>, Error>>()?)
 }
+
+pub fn format_addressees(addresses: &Value) -> Result<Value, Error> {
+    Ok(json!(addresses
+        .as_array()
+        .req()?
+        .iter()
+        .cloned()
+        // add some extra fields required by the app
+        .filter_map(|addr| {
+            extend(
+                addr,
+                json!({
+                    "is_sweep": false,
+                    "memo": "",
+                    "change_subaccount": 0,
+                }),
+            )
+            .ok()
+        })
+        .collect::<Vec<Value>>()))
+}
