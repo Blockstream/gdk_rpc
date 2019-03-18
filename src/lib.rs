@@ -361,6 +361,8 @@ pub extern "C" fn GA_create_transaction(
         "is_sweep": false,
         "memo": "",
         "change_subaccount": 0,
+        "fee": 100, // FIXME
+        "satoshi": 500, // FIXME
     });
 
     let tx_unsigned = match wallet.create_transaction(&details) {
