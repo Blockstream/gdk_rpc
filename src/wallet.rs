@@ -10,11 +10,11 @@ use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
 use failure::Error;
-use serde_json::{from_value, Value};
+use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
-use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, string_from_val, usat_to_fbtc};
+use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -92,8 +92,8 @@ impl Wallet {
         // check for new transactions
         // XXX does the app care about the transaction data in the event?
         if let Some(last_tx) = self._get_transactions(1, 0)?.0.get(0) {
-            let txid = string_from_val(&last_tx["txhash"])?;
-            let txid = Sha256dHash::from_hex(&txid)?;
+            let txid = last_tx["txhash"].as_str().req()?;
+            let txid = Sha256dHash::from_hex(txid)?;
             if self.last_tx != Some(txid) {
                 self.last_tx = Some(txid);
                 msgs.push(json!({ "event": "transaction", "transaction": last_tx }));
@@ -133,7 +133,7 @@ impl Wallet {
     }
 
     pub fn get_balance(&self, details: &Value) -> Result<Value, Error> {
-        let min_conf = from_value(details["num_confs"].clone())?;
+        let min_conf = details["num_confs"].as_u64().req()? as u32;
         self._get_balance(min_conf)
     }
 
@@ -146,7 +146,7 @@ impl Wallet {
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
-        let page: u32 = from_value(details["page_id"].clone())?;
+        let page = details["page_id"].as_u64().req()? as u32;
         let (txs, potentially_has_more) = self._get_transactions(PER_PAGE, PER_PAGE * page)?;
 
         Ok(json!({
@@ -169,9 +169,9 @@ impl Wallet {
         let txs = txdescs
             .into_iter()
             .map(|txdesc| {
-                let txid = Sha256dHash::from_hex(&string_from_val(&txdesc["txid"])?)?;
-                let blockhash = string_from_val(&txdesc["blockhash"])
-                    .ok()
+                let txid = Sha256dHash::from_hex(txdesc["txid"].as_str().req()?)?;
+                let blockhash = txdesc["blockhash"]
+                    .as_str()
                     .map(|b| Sha256dHash::from_hex(&b).unwrap());
                 let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
 
@@ -184,8 +184,8 @@ impl Wallet {
     pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
         let txid = Sha256dHash::from_hex(txid)?;
         let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
-        let blockhash = string_from_val(&txdesc["blockhash"])
-            .ok()
+        let blockhash = txdesc["blockhash"]
+            .as_str()
             .map(|b| Sha256dHash::from_hex(&b).unwrap());
         let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
         format_gdk_tx(&txdesc, tx)
@@ -212,32 +212,29 @@ impl Wallet {
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
-        let unfunded_tx = string_from_val(&details["hex"])?;
-
-        let funded_tx: Value = self.rpc.call("fundrawtransaction", &[json!(unfunded_tx)])?;
-        let funded_tx = string_from_val(&funded_tx["hex"])?;
+        let funded_tx: Value = self
+            .rpc
+            .call("fundrawtransaction", &[details["hex"].clone()])?;
 
         debug!("create_transaction funded_tx: {:?}", funded_tx);
 
         let signed_tx: Value = self
             .rpc
-            .call("signrawtransactionwithwallet", &[json!(funded_tx)])?;
+            .call("signrawtransactionwithwallet", &[funded_tx["hex"].clone()])?;
 
-        let complete: bool = from_value(signed_tx["complete"].clone())?;
+        let complete = signed_tx["complete"].as_bool().req()?;
 
         if !complete {
-            let errors = signed_tx
-                .get("errors")
-                .map_or("".to_string(), |errors| errors.to_string());
+            let errors = signed_tx["errors"].to_string();
             bail!("the transaction cannot be signed: {}", errors)
         }
 
-        Ok(from_value(signed_tx["hex"].clone())?)
+        Ok(signed_tx["hex"].as_str().req()?.to_string())
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
-        let tx_hex = string_from_val(&details["hex"])?;
-        Ok(self.rpc.send_raw_transaction(&tx_hex)?)
+        let tx_hex = details["hex"].as_str().req()?;
+        Ok(self.rpc.send_raw_transaction(tx_hex)?)
     }
 
     pub fn send_raw_transaction(&self, tx_hex: &String) -> Result<String, Error> {
@@ -260,7 +257,7 @@ impl Wallet {
     pub fn _make_fee_estimates(&self) -> Result<Value, Error> {
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
         let minrelayfee = json!(btc_to_usat(
-            from_value::<f64>(mempoolinfo["minrelaytxfee"].clone())? / 1000.0
+            mempoolinfo["minrelaytxfee"].as_f64().req()? / 1000.0
         ));
 
         let mut estimates: Vec<Value> = (2u16..24u16)
@@ -293,7 +290,7 @@ impl Wallet {
 
     pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
         // XXX should convert_amonut support negative numbers?
-        let amount: u64 = from_value(details["satoshi"].clone())?;
+        let amount = details["satoshi"].as_u64().req()?;
         Ok(self._convert_amount(amount))
     }
 
@@ -332,16 +329,14 @@ impl fmt::Debug for Wallet {
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
-    let amount = btc_to_isat(from_value(txdesc["amount"].clone())?);
-    let fee = from_value::<f64>(txdesc["fee"].clone())
-        .ok()
-        .map_or(0, |f| btc_to_usat(f * -1.0));
+    let amount = btc_to_isat(txdesc["amount"].as_f64().req()?);
+    let fee = txdesc["fee"].as_f64().map_or(0, |f| btc_to_usat(f * -1.0));
     let weight = tx.get_weight();
     let vsize = (weight as f32 / 4.0) as u32;
 
-    let type_str = match string_from_val(&txdesc["category"]).ok() {
+    let type_str = match txdesc["category"].as_str() {
         // for listtransactions, read out the category field
-        Some(category) => match category.as_str() {
+        Some(category) => match category {
             "send" => "outgoing",
             "receive" => "incoming",
             "immature" => "incoming",
@@ -360,10 +355,10 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
     Ok(json!({
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
-        "created_at": fmt_time(from_value(txdesc["time"].clone())?),
+        "created_at": fmt_time(txdesc["time"].as_u64().req()?),
 
         "type": type_str,
-        "memo": string_from_val(&txdesc["label"]).unwrap_or("".to_string()),
+        "memo": txdesc["label"].as_str().unwrap_or(""),
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
@@ -376,7 +371,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "transaction_vsize": vsize,
         "transaction_weight": weight,
 
-        "rbf_optin": txdesc.get("bip125-replaceable").req()?.as_str().req()? == "yes",
+        "rbf_optin": txdesc["bip125-replaceable"].as_str().req()? == "yes",
         "cap_cpfp": false, // TODO
         "can_rbf": false, // TODO
         "has_payment_request": false, // TODO
@@ -411,15 +406,11 @@ fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
         .req()?
         .iter()
         .map(|desc| {
-            let address = string_from_val(&desc["address"])?;
-            let value: u64 = from_value(desc["satoshi"].clone()).unwrap_or(0);
+            let mut address = desc["address"].as_str().req()?;
+            let value = desc["satoshi"].as_u64().unwrap_or(0);
 
-            debug!("make_output dest: {}, value: {}", address, value);
-
-            let mut address = address.as_str();
             if address.to_lowercase().starts_with("bitcoin:") {
                 address = address.split(":").nth(1).req()?;
-                debug!("make_output dest --> {}", address);
             }
             // TODO: support BIP21 amount
 

@@ -612,8 +612,8 @@ pub extern "C" fn GA_convert_json_value_to_string(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res: String = tryit!(from_value(json[path].clone()));
-    ok!(ret, make_str(res))
+    let res = tryit!(json[path].as_str().req());
+    ok!(ret, make_str(res.to_string()))
 }
 
 #[no_mangle]
@@ -624,7 +624,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res: u32 = tryit!(from_value(json[path].clone()));
+    let res = tryit!(json[path].as_u64().req()) as u32;
     ok!(ret, res)
 }
 
@@ -636,7 +636,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res: u64 = tryit!(from_value(json[path].clone()));
+    let res = tryit!(json[path].as_u64().req());
     ok!(ret, res)
 }
 
@@ -648,8 +648,8 @@ pub extern "C" fn GA_convert_json_value_to_json(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let jstr: String = tryit!(from_value(json[path].clone()));
-    let res: Value = tryit!(serde_json::from_str(&jstr));
+    let jstr = tryit!(json[path].as_str().req());
+    let res: Value = tryit!(serde_json::from_str(jstr));
     ok_json!(ret, res)
 }
 
