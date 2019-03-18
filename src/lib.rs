@@ -187,8 +187,6 @@ pub extern "C" fn GA_connect(
     sess.network = Some(network_name);
     sess.wallet = Some(wallet);
 
-    tryit!(sess.tick());
-
     debug!("GA_connect() {:?}", sess);
 
     GA_OK
@@ -248,6 +246,7 @@ pub extern "C" fn GA_login(
     tryit!(wallet.login(&mnemonic));
 
     sess.notify(json!({ "event": "settings", "settings": sess.settings }));
+    tryit!(sess.tick());
 
     ok!(ret, GA_auth_handler::success())
 }
@@ -761,6 +760,8 @@ pub extern "C" fn GA_login_with_pin(
 
     let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
+
+    tryit!(sess.tick());
 
     GA_OK
 }
