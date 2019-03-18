@@ -323,7 +323,15 @@ pub extern "C" fn GA_create_transaction(
     debug!("GA_create_transaction() {:?}", details);
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let tx_unsigned = tryit!(wallet.create_transaction(&details));
+
+    let (outs, tx_unsigned) = match wallet.create_transaction(&details) {
+        Err(err) => {
+            // errors are returned as a GA_OK with "error" in the returned object
+            debug!("GA_create_transaction error: {:?}", err);
+            return ok_json!(ret, json!({ "error": err.to_string() }));
+        },
+        Ok(x) => x,
+    };
 
     debug!("GA_create_transaction() tx_unsigned {}", tx_unsigned);
 
