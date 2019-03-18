@@ -120,7 +120,6 @@ extern "C" {
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
-
     fn GA_set_pin(
         sess: *const GA_session,
         mnemonic: *const c_char,
@@ -133,7 +132,6 @@ extern "C" {
         device_id: *const c_char,
         pin_data: *const GA_json,
     ) -> i32;
-
 
     fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
         -> i32;
@@ -376,11 +374,7 @@ fn a5_test_pin() {
 
     let pin_data = make_json(pin_data);
     assert_eq!(GA_OK, unsafe {
-        GA_login_with_pin(
-            SESS.0,
-            pin.as_ptr(),
-            pin_data,
-        )
+        GA_login_with_pin(SESS.0, pin.as_ptr(), pin_data)
     });
 }
 
