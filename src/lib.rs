@@ -536,7 +536,7 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
         .get_fee_estimates()
         .or_err("fee estimates unavailable"));
 
-    ok_json!(ret, estimates)
+    ok_json!(ret, json!({ "fees": estimates }))
 }
 
 //
