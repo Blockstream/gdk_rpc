@@ -327,7 +327,9 @@ pub extern "C" fn GA_create_transaction(
 
     debug!("GA_create_transaction() tx_unsigned {}", tx_unsigned);
 
-    ok_json!(ret, json!({ "error": "", "hex": tx_unsigned }))
+    // echo "addresses" back, so that the output of GA_create_transaction
+    // can be beed back into it as input
+    ok_json!(ret, json!({ "error": "", "hex": tx_unsigned, "addresses": details["addresses"] }))
 }
 
 #[no_mangle]
