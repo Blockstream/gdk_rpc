@@ -82,6 +82,7 @@ impl GA_auth_handler {
         unsafe { transmute(Box::new(handler)) }
     }
     fn done(res: Value) -> *const GA_auth_handler {
+        debug!("GA_auth_handler::done() {:?}", res);
         let handler = GA_auth_handler::Done(res);
         unsafe { transmute(Box::new(handler)) }
     }
