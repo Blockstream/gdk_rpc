@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
-use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc};
+use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc, f64_from_val};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
