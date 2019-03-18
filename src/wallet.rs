@@ -14,7 +14,7 @@ use serde_json::{from_value, Value};
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
-use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, usat_to_fbtc};
+use crate::util::{btc_to_isat, btc_to_usat, extend, fmt_time, string_from_val, usat_to_fbtc};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -92,7 +92,7 @@ impl Wallet {
         // check for new transactions
         // XXX does the app care about the transaction data in the event?
         if let Some(last_tx) = self._get_transactions(1, 0)?.0.get(0) {
-            let txid: String = from_value(last_tx["txhash"].clone())?;
+            let txid = string_from_val(&last_tx["txhash"])?;
             let txid = Sha256dHash::from_hex(&txid)?;
             if self.last_tx != Some(txid) {
                 self.last_tx = Some(txid);
@@ -169,8 +169,8 @@ impl Wallet {
         let txs = txdescs
             .into_iter()
             .map(|txdesc| {
-                let txid = Sha256dHash::from_hex(&from_value::<String>(txdesc["txid"].clone())?)?;
-                let blockhash = from_value::<String>(txdesc["blockhash"].clone())
+                let txid = Sha256dHash::from_hex(&string_from_val(&txdesc["txid"])?)?;
+                let blockhash = string_from_val(&txdesc["blockhash"])
                     .ok()
                     .map(|b| Sha256dHash::from_hex(&b).unwrap());
                 let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
@@ -184,7 +184,7 @@ impl Wallet {
     pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
         let txid = Sha256dHash::from_hex(txid)?;
         let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
-        let blockhash = from_value::<String>(txdesc["blockhash"].clone())
+        let blockhash = string_from_val(&txdesc["blockhash"])
             .ok()
             .map(|b| Sha256dHash::from_hex(&b).unwrap());
         let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
@@ -212,10 +212,10 @@ impl Wallet {
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
-        let unfunded_tx: String = from_value(details["hex"].clone())?;
+        let unfunded_tx = string_from_val(&details["hex"])?;
 
         let funded_tx: Value = self.rpc.call("fundrawtransaction", &[json!(unfunded_tx)])?;
-        let funded_tx: String = from_value(funded_tx["hex"].clone())?;
+        let funded_tx = string_from_val(&funded_tx["hex"])?;
 
         debug!("create_transaction funded_tx: {:?}", funded_tx);
 
@@ -236,7 +236,7 @@ impl Wallet {
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
-        let tx_hex: String = from_value(details["hex"].clone())?;
+        let tx_hex = string_from_val(&details["hex"])?;
         Ok(self.rpc.send_raw_transaction(&tx_hex)?)
     }
 
@@ -333,15 +333,15 @@ impl fmt::Debug for Wallet {
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
     let amount = btc_to_isat(from_value(txdesc["amount"].clone())?);
-    let fee = txdesc
-        .get("fee")
-        .map_or(0, |f| btc_to_usat(f.as_f64().unwrap() * -1.0));
+    let fee = from_value::<f64>(txdesc["fee"].clone())
+        .ok()
+        .map_or(0, |f| btc_to_usat(f * -1.0));
     let weight = tx.get_weight();
     let vsize = (weight as f32 / 4.0) as u32;
 
-    let type_str = match txdesc.get("category") {
+    let type_str = match string_from_val(&txdesc["category"]).ok() {
         // for listtransactions, read out the category field
-        Some(category) => match category.as_str().req()? {
+        Some(category) => match category.as_str() {
             "send" => "outgoing",
             "receive" => "incoming",
             "immature" => "incoming",
@@ -363,7 +363,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
         "created_at": fmt_time(from_value(txdesc["time"].clone())?),
 
         "type": type_str,
-        "memo": from_value::<String>(txdesc["label"].clone()).unwrap_or("".to_string()),
+        "memo": string_from_val(&txdesc["label"]).unwrap_or("".to_string()),
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
@@ -411,7 +411,7 @@ fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
         .req()?
         .iter()
         .map(|desc| {
-            let address: String = from_value(desc["address"].clone())?;
+            let address = string_from_val(&desc["address"])?;
             let value: u64 = from_value(desc["satoshi"].clone()).unwrap_or(0);
 
             debug!("make_output dest: {}, value: {}", address, value);
