@@ -199,10 +199,9 @@ impl Wallet {
         format_gdk_tx(&txdesc, tx)
     }
 
-    pub fn create_transaction(&self, details: &Value) -> Result<(HashMap<String, f64>, String), Error> {
+    pub fn create_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("create_transaction(): {:?}", details);
 
-        // XXX use createrawtx?
         let outs = parse_outs(&details)?;
         debug!("create_transaction() addresses: {:?}", outs);
 
@@ -216,7 +215,7 @@ impl Wallet {
         // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
 
-        Ok((outs, unfunded_tx))
+        Ok(unfunded_tx)
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
@@ -400,14 +399,11 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
         "subaccount": 0,
         "subaccounts": [],
-        "data": "",
-        "private_key": "",
 
         "fee": fee,
         "fee_rate": (fee as f64)/(vsize as f64),
 
-        "addresses": [],
-        "addressees": [], // expected to be received with a typo by some wallet software
+        "addressees": [], // notice the extra "e" -- its intentional
         "inputs": [], // tx.input.iter().map(format_gdk_input).collect(),
         "outputs": [], //tx.output.iter().map(format_gdk_output).collect(),
     }))
@@ -416,11 +412,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
     debug!("parse_addresses {:?}", details);
 
-    Ok(details
-        .get("addresses")
-        // some software is sending this with a typo
-        .or_else(|| details.get("addressees"))
-        .req()?
+    Ok(details["addressees"]
         .as_array()
         .req()?
         .iter()

@@ -46,7 +46,7 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{log_filter, make_str, read_str, btc_to_usat};
+use crate::util::{btc_to_usat, log_filter, make_str, read_str};
 use crate::wallet::{
     generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
 };
@@ -324,27 +324,27 @@ pub extern "C" fn GA_create_transaction(
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
-    let (outs, tx_unsigned) = match wallet.create_transaction(&details) {
+    // we need to echo "addressees" back, so that the output of GA_create_transaction
+    // can be beed back into it as input
+    let addressees = &details["addressees"];
+
+    let tx_unsigned = match wallet.create_transaction(&details) {
         Err(err) => {
             // errors are returned as a GA_OK with "error" in the returned object
             debug!("GA_create_transaction error: {:?}", err);
-            return ok_json!(ret, json!({ "error": err.to_string() }));
-        },
+            return ok_json!(
+                ret,
+                json!({ "error": err.to_string(), "addressees": addressees })
+            );
+        }
         Ok(x) => x,
     };
 
     debug!("GA_create_transaction() tx_unsigned {}", tx_unsigned);
 
-    // echo "addresses" back, so that the output of GA_create_transaction
-    // can be beed back into it as input
-    let addresses: Vec<Value> = outs
-        .into_iter()
-        .map(|(address, amount)| json!({ "address": address, "satoshi": btc_to_usat(amount) }))
-        .collect();
-
     ok_json!(
         ret,
-        json!({ "error": "", "hex": tx_unsigned, "addresses": addresses, "addressees": addresses })
+        json!({ "error": "", "hex": tx_unsigned, "addressees": addressees })
     )
 }
 
