@@ -336,8 +336,13 @@ impl fmt::Debug for Wallet {
 }
 
 pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
+    debug!("mnemonic_to_hex({})", mnemonic);
     let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+    debug!("mnemonic_to_hex() mnem: {:?}", mnem);
     let seed = Seed::new(&mnem, "");
+    debug!("mnemonic_to_hex() seed: {:?}", seed);
+    debug!("mnemonic_to_hex() seed bytes: {:?}", seed.as_bytes());
+    debug!("mnemonic_to_hex() seed bytes hex: {:?}", hex::encode(seed.as_bytes()));
     Ok(hex::encode(seed.as_bytes()))
 }
 
