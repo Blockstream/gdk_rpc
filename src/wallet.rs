@@ -92,7 +92,8 @@ impl Wallet {
         // check for new transactions
         // XXX does the app care about the transaction data in the event?
         if let Some(last_tx) = self._get_transactions(1, 0)?.0.get(0) {
-            let txid = Sha256dHash::from_hex(last_tx.get("txhash").req()?.as_str().req()?)?;
+            let txid: String = from_value(last_tx["txhash"].clone())?;
+            let txid = Sha256dHash::from_hex(&txid)?;
             if self.last_tx != Some(txid) {
                 self.last_tx = Some(txid);
                 msgs.push(json!({ "event": "transaction", "transaction": last_tx }));
@@ -132,7 +133,7 @@ impl Wallet {
     }
 
     pub fn get_balance(&self, details: &Value) -> Result<Value, Error> {
-        let min_conf = details.get("num_confs").req()?.as_u64().req()? as u32;
+        let min_conf = from_value(details["num_confs"].clone())?;
         self._get_balance(min_conf)
     }
 
@@ -145,7 +146,7 @@ impl Wallet {
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
-        let page = details.get("page_id").req()?.as_u64().req()? as u32;
+        let page: u32 = from_value(details["page_id"].clone())?;
         let (txs, potentially_has_more) = self._get_transactions(PER_PAGE, PER_PAGE * page)?;
 
         Ok(json!({
@@ -168,10 +169,10 @@ impl Wallet {
         let txs = txdescs
             .into_iter()
             .map(|txdesc| {
-                let txid = Sha256dHash::from_hex(txdesc.get("txid").unwrap().as_str().unwrap())?;
-                let blockhash = txdesc
-                    .get("blockhash")
-                    .map(|b| Sha256dHash::from_hex(b.as_str().unwrap()).unwrap());
+                let txid = Sha256dHash::from_hex(&from_value::<String>(txdesc["txid"].clone())?)?;
+                let blockhash = from_value::<String>(txdesc["blockhash"].clone())
+                    .ok()
+                    .map(|b| Sha256dHash::from_hex(&b).unwrap());
                 let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
 
                 format_gdk_tx(txdesc, tx)
@@ -183,9 +184,9 @@ impl Wallet {
     pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
         let txid = Sha256dHash::from_hex(txid)?;
         let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
-        let blockhash = txdesc
-            .get("blockhash")
-            .map(|b| Sha256dHash::from_hex(b.as_str().unwrap()).unwrap());
+        let blockhash = from_value::<String>(txdesc["blockhash"].clone())
+            .ok()
+            .map(|b| Sha256dHash::from_hex(&b).unwrap());
         let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
         format_gdk_tx(&txdesc, tx)
     }
@@ -222,7 +223,9 @@ impl Wallet {
             .rpc
             .call("signrawtransactionwithwallet", &[json!(funded_tx)])?;
 
-        if signed_tx.get("complete").req()?.as_bool().req()? == false {
+        let complete: bool = from_value(signed_tx["complete"].clone())?;
+
+        if !complete {
             let errors = signed_tx
                 .get("errors")
                 .map_or("".to_string(), |errors| errors.to_string());
@@ -233,8 +236,8 @@ impl Wallet {
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
-        let tx_hex = details.get("hex").req()?.as_str().req()?;
-        Ok(self.rpc.send_raw_transaction(tx_hex)?)
+        let tx_hex: String = from_value(details["hex"].clone())?;
+        Ok(self.rpc.send_raw_transaction(&tx_hex)?)
     }
 
     pub fn send_raw_transaction(&self, tx_hex: &String) -> Result<String, Error> {
@@ -257,7 +260,7 @@ impl Wallet {
     pub fn _make_fee_estimates(&self) -> Result<Value, Error> {
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
         let minrelayfee = json!(btc_to_usat(
-            mempoolinfo.get("minrelaytxfee").req()?.as_f64().req()? / 1000.0
+            from_value::<f64>(mempoolinfo["minrelaytxfee"].clone())? / 1000.0
         ));
 
         let mut estimates: Vec<Value> = (2u16..24u16)
@@ -290,7 +293,7 @@ impl Wallet {
 
     pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
         // XXX should convert_amonut support negative numbers?
-        let amount = details.get("satoshi").req()?.as_u64().req()?;
+        let amount: u64 = from_value(details["satoshi"].clone())?;
         Ok(self._convert_amount(amount))
     }
 
@@ -329,7 +332,7 @@ impl fmt::Debug for Wallet {
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
-    let amount = btc_to_isat(txdesc.get("amount").req()?.as_f64().req()?);
+    let amount = btc_to_isat(from_value(txdesc["amount"].clone())?);
     let fee = txdesc
         .get("fee")
         .map_or(0, |f| btc_to_usat(f.as_f64().unwrap() * -1.0));
@@ -357,9 +360,10 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
 
     Ok(json!({
         "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
-        "created_at": fmt_time(txdesc.get("time").req()?.as_u64().req()?),
+        "created_at": fmt_time(from_value(txdesc["time"].clone())?),
+
         "type": type_str,
-        "memo": txdesc.get("label").map_or("".to_string(), |l| l.as_str().unwrap().to_string()),
+        "memo": from_value::<String>(txdesc["label"].clone()).unwrap_or("".to_string()),
 
         "txhash": tx.txid().to_hex(),
         "transaction": hex::encode(&rawtx),
@@ -407,11 +411,12 @@ fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
         .req()?
         .iter()
         .map(|desc| {
-            let mut address = desc.get("address").req()?.as_str().req()?;
-            let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(0);
+            let address: String = from_value(desc["address"].clone())?;
+            let value: u64 = from_value(desc["satoshi"].clone()).unwrap_or(0);
 
             debug!("make_output dest: {}, value: {}", address, value);
 
+            let mut address = address.as_str();
             if address.to_lowercase().starts_with("bitcoin:") {
                 address = address.split(":").nth(1).req()?;
                 debug!("make_output dest --> {}", address);
