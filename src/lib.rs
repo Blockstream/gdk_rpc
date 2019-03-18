@@ -249,6 +249,8 @@ pub extern "C" fn GA_login(
 
     sess.mnemonic = Some(mnemonic);
 
+    sess.notify(json!({ "event": "settings", "settings": sess.settings }));
+
     ok!(ret, GA_auth_handler::success())
 }
 
@@ -552,8 +554,6 @@ pub extern "C" fn GA_set_notification_handler(
     let sess = sm.get_mut(sess).unwrap();
 
     sess.notify = Some((handler, context));
-
-    sess.notify(json!({ "event": "settings", "settings": sess.settings }));
 
     GA_OK
 }
