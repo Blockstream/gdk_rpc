@@ -405,7 +405,7 @@ pub extern "C" fn GA_sign_transaction(
 
     ok!(
         ret,
-        GA_auth_handler::done(json!({ "error": "", "hex": tx_signed }))
+        GA_auth_handler::done(json!({ "error": "", "hex": tx_signed, "is_sweep": false }))
     )
 }
 
