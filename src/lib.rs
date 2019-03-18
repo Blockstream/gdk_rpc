@@ -32,7 +32,7 @@ pub mod settings;
 pub mod util;
 pub mod wallet;
 
-use serde_json::Value;
+use serde_json::{from_value, Value};
 
 use std::ffi::CString;
 use std::mem::transmute;
@@ -581,7 +581,7 @@ pub extern "C" fn GA_change_settings(
     let new_settings = &unsafe { &*settings }.0;
 
     // XXX should we allow patching just some setting fields instead of replacing it?
-    sess.settings = tryit!(serde_json::from_value(new_settings.clone()));
+    sess.settings = tryit!(from_value(new_settings.clone()));
 
     ok!(ret, GA_auth_handler::success())
 }
@@ -612,10 +612,7 @@ pub extern "C" fn GA_convert_json_value_to_string(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = tryit!(json
-        .get(&path)
-        .map(|x| x.to_string())
-        .or_err("missing path"));
+    let res: String = tryit!(from_value(json[path].clone()));
     ok!(ret, make_str(res))
 }
 
@@ -627,11 +624,7 @@ pub extern "C" fn GA_convert_json_value_to_uint32(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = tryit!(json
-        .get(&path)
-        .and_then(|x| x.as_u64())
-        .map(|x| x as u32)
-        .or_err("invalid number"));
+    let res: u32 = tryit!(from_value(json[path].clone()));
     ok!(ret, res)
 }
 
@@ -643,10 +636,7 @@ pub extern "C" fn GA_convert_json_value_to_uint64(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let res = tryit!(json
-        .get(&path)
-        .and_then(|x| x.as_u64())
-        .or_err("invalid number"));
+    let res: u64 = tryit!(from_value(json[path].clone()));
     ok!(ret, res)
 }
 
@@ -658,10 +648,7 @@ pub extern "C" fn GA_convert_json_value_to_json(
 ) -> i32 {
     let json = &unsafe { &*json }.0;
     let path = read_str(path);
-    let jstr = tryit!(json
-        .get(&path)
-        .map(|x| x.to_string())
-        .or_err("missing path"));
+    let jstr: String = tryit!(from_value(json[path].clone()));
     let res: Value = tryit!(serde_json::from_str(&jstr));
     ok_json!(ret, res)
 }
