@@ -120,6 +120,15 @@ extern "C" {
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
+
+    fn GA_set_pin(
+        sess: *const GA_session,
+        mnemonic: *const c_char,
+        pin: *const c_char,
+        device_id: *const c_char,
+        ret: *mut *const GA_json,
+    ) -> i32;
+
     fn GA_auth_handler_get_status(handler: *const GA_auth_handler, ret: *mut *const GA_json)
         -> i32;
 
@@ -339,7 +348,29 @@ fn a4_send_tx() {
 }
 
 #[test]
-fn a5_test_destroy_session() {
+fn a5_test_pin() {
+    let mnemonic =
+        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
+    let mnemonic = CString::new(mnemonic).unwrap();
+    let pin = CString::new("1234").unwrap();
+    let device_id = CString::new("foo").unwrap();
+    let mut pin_data: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_set_pin(
+            SESS.0,
+            mnemonic.as_ptr(),
+            pin.as_ptr(),
+            device_id.as_ptr(),
+            &mut pin_data,
+        )
+    });
+    let pin_data = read_json(pin_data);
+
+    debug!("pin data: {:?}", pin_data);
+}
+
+#[test]
+fn a6_test_destroy_session() {
     debug!("destroying session");
     assert_eq!(GA_OK, unsafe { GA_destroy_session(SESS.0) })
 }

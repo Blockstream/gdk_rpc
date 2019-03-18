@@ -47,7 +47,7 @@ use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
 use crate::util::{log_filter, make_str, read_str};
-use crate::wallet::{Wallet, mnemonic_to_hex, hex_to_mnemonic};
+use crate::wallet::{hex_to_mnemonic, mnemonic_to_hex, Wallet};
 
 lazy_static! {
     static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
@@ -122,7 +122,7 @@ macro_rules! ok {
 
 macro_rules! ok_json {
     ($t:expr, $x:expr) => {
-        ok!($t, GA_json::new(json!($x)));
+        ok!($t, GA_json::new(json!($x)))
     };
 }
 
