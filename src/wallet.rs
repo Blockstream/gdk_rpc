@@ -336,14 +336,8 @@ impl fmt::Debug for Wallet {
 }
 
 pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
-    debug!("mnemonic_to_hex({})", mnemonic);
     let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
-    debug!("mnemonic_to_hex() mnem: {:?}", mnem);
-    let seed = Seed::new(&mnem, "");
-    debug!("mnemonic_to_hex() seed: {:?}", seed);
-    debug!("mnemonic_to_hex() seed bytes: {:?}", seed.as_bytes());
-    debug!("mnemonic_to_hex() seed bytes hex: {:?}", hex::encode(seed.as_bytes()));
-    Ok(hex::encode(seed.as_bytes()))
+    Ok(hex::encode(mnem.entropy()))
 }
 
 pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
@@ -354,7 +348,6 @@ pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
     debug!("hex_to_mnemonic mnem: {:?}", mnem);
     Ok(mnem.into_phrase())
 }
-
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
