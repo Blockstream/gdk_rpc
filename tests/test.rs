@@ -241,7 +241,21 @@ fn a4_test_currencies() {
     assert_eq!(GA_OK, unsafe {
         GA_convert_amount(SESS.0, details, &mut units)
     });
-    debug!("converted units: {:?}\n", read_json(units));
+    debug!("converted units from satoshi: {:?}\n", read_json(units));
+
+    let details = make_json(json!({ "btc": 0.1 }));
+    let mut units: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_convert_amount(SESS.0, details, &mut units)
+    });
+    debug!("converted units from btc: {:?}\n", read_json(units));
+
+    let details = make_json(json!({ "fiat": 400 }));
+    let mut units: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_convert_amount(SESS.0, details, &mut units)
+    });
+    debug!("converted units from fiat: {:?}\n", read_json(units));
 }
 
 #[test]

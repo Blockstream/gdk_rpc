@@ -300,7 +300,9 @@ impl Wallet {
         let amount = details["satoshi"]
             .as_u64()
             .or_else(|| details["btc"].as_f64().map(btc_to_usat))
+            .or_else(|| details["fiat"].as_f64().map(|x| self._fiat_to_usat(x)))
             .or_err("id_no_amount_specified")?;
+
         Ok(self._convert_satoshi(amount))
     }
 
@@ -320,6 +322,10 @@ impl Wallet {
             "fiat_currency": currency,
             "fiat": (amount_f * exchange_rate).to_string(),
         })
+    }
+
+    fn _fiat_to_usat(&self, amount: f64) -> u64 {
+        btc_to_usat(amount / self.exchange_rate("USD"))
     }
 }
 
