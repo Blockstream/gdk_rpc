@@ -47,7 +47,9 @@ use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
 use crate::util::{log_filter, make_str, read_str};
-use crate::wallet::{hex_to_mnemonic, mnemonic_to_hex, Wallet};
+use crate::wallet::{
+    generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
+};
 
 lazy_static! {
     static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
@@ -434,7 +436,7 @@ pub extern "C" fn GA_get_subaccount(
 
 #[no_mangle]
 pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
-    let mnemonic = Wallet::generate_mnemonic();
+    let mnemonic = generate_mnemonic();
 
     ok!(ret, make_str(mnemonic))
 }
@@ -442,7 +444,7 @@ pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -> i32 {
     let mnemonic = read_str(mnemonic);
-    let is_valid = if Wallet::validate_mnemonic(mnemonic) {
+    let is_valid = if validate_mnemonic(mnemonic) {
         GA_TRUE
     } else {
         GA_FALSE

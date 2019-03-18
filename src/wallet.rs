@@ -319,14 +319,6 @@ impl Wallet {
             "fiat": (amount_f * exchange_rate).to_string(),
         })
     }
-
-    pub fn generate_mnemonic() -> String {
-        Mnemonic::new(MnemonicType::Words24, Language::English).into_phrase()
-    }
-
-    pub fn validate_mnemonic(mnemonic: String) -> bool {
-        Mnemonic::validate(&mnemonic, Language::English).is_ok()
-    }
 }
 
 impl fmt::Debug for Wallet {
@@ -344,6 +336,14 @@ pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
     let bytes = hex::decode(hex)?;
     let mnem = Mnemonic::from_entropy(&bytes, Language::English)?;
     Ok(mnem.into_phrase())
+}
+
+pub fn generate_mnemonic() -> String {
+    Mnemonic::new(MnemonicType::Words24, Language::English).into_phrase()
+}
+
+pub fn validate_mnemonic(mnemonic: String) -> bool {
+    Mnemonic::validate(&mnemonic, Language::English).is_ok()
 }
 
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
