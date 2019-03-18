@@ -297,13 +297,13 @@ impl Wallet {
 
     pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
         // XXX should convert_amonut support negative numbers?
-        let amount = details["satoshi"]
+        let satoshi = details["satoshi"]
             .as_u64()
-            .or_else(|| details["btc"].as_f64().map(btc_to_usat))
-            .or_else(|| details["fiat"].as_f64().map(|x| self._fiat_to_usat(x)))
+            .or_else(|| f64_from_val(&details["btc"]).map(btc_to_usat))
+            .or_else(|| f64_from_val(&details["fiat"]).map(|x| self._fiat_to_usat(x)))
             .or_err("id_no_amount_specified")?;
 
-        Ok(self._convert_satoshi(amount))
+        Ok(self._convert_satoshi(satoshi))
     }
 
     fn _convert_satoshi(&self, amount: u64) -> Value {

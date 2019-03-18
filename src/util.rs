@@ -38,6 +38,11 @@ pub fn usat_to_fbtc(sat: u64) -> f64 {
     (sat as f64) / SAT_PER_BTC
 }
 
+pub fn f64_from_val(val: Value) -> Option<f64> {
+    val.as_f64()
+        .or_else(|| val.as_str().and_then(|x| x.parse().ok()))
+}
+
 pub fn extend(mut dest: Value, mut src: Value) -> Result<Value, Error> {
     let dest = dest.as_object_mut().req()?;
     for (k, v) in src.as_object_mut().req()? {
