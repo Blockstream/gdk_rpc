@@ -723,6 +723,27 @@ pub extern "C" fn GA_get_watch_only_username(
     ok!(ret, make_str("".to_string()))
 }
 
+#[no_mangle]
+pub extern "C" fn GA_set_pin(
+    _sess: *const GA_session,
+    _mnemonic: *const c_char,
+    _pin: *const c_char,
+    _device_id: *const c_char,
+    ret: *mut *const GA_json,
+) -> i32 {
+    // FIXME setting a PIN does not actually do anything, just a successful no-op
+    ok_json!(ret, {})
+}
+
+#[no_mangle]
+pub extern "C" fn GA_login_with_pin(
+    _sess: *mut GA_session,
+    _pin: *const c_char,
+    _pin_data: *const GA_json,
+) -> i32 {
+    GA_OK
+}
+
 //
 // Unimplemented and GA_ERROR's
 //
@@ -734,15 +755,6 @@ pub extern "C" fn GA_connect_with_proxy(
     _proxy_uri: *const c_char,
     _use_tor: u32,
     _log_level: u32,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_login_with_pin(
-    _sess: *mut GA_session,
-    _pin: *const c_char,
-    _pin_data: *const GA_json,
 ) -> i32 {
     GA_ERROR
 }
@@ -797,17 +809,6 @@ pub extern "C" fn GA_get_unspent_outputs_for_private_key(
     _private_key: *const c_char,
     _password: *const c_char,
     _unused: u32,
-    _ret: *mut *const GA_json,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GA_set_pin(
-    _sess: *const GA_session,
-    _mnemonic: *const c_char,
-    _pin: *const c_char,
-    _device_id: *const c_char,
     _ret: *mut *const GA_json,
 ) -> i32 {
     GA_ERROR
