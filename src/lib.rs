@@ -320,8 +320,12 @@ pub extern "C" fn GA_create_transaction(
     let sess = sm.get(sess).unwrap();
     let details = &unsafe { &*details }.0;
 
+    debug!("GA_create_transaction() {:?}", details);
+
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let tx_unsigned = tryit!(wallet.create_transaction(&details));
+
+    debug!("GA_create_transaction() tx_unsigned {}", tx_unsigned);
 
     ok_json!(ret, json!({ "error": "", "hex": tx_unsigned }))
 }
@@ -336,8 +340,12 @@ pub extern "C" fn GA_sign_transaction(
     let sess = sm.get(sess).unwrap();
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
+    debug!("GA_sign_transaction() {:?}", tx_detail_unsigned);
+
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let tx_signed = tryit!(wallet.sign_transaction(&tx_detail_unsigned));
+
+    debug!("GA_sign_transaction() {:?}", tx_signed);
 
     ok!(
         ret,
