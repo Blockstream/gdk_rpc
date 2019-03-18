@@ -22,7 +22,7 @@ impl Settings {
                 email_outgoing: false,
             },
             required_num_blocks: 2, // XXX
-            sound: false,
+            sound: true,
             altimeout: 5,
         }
     }
