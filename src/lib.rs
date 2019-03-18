@@ -329,8 +329,13 @@ pub extern "C" fn GA_create_transaction(
 
     // echo "addresses" back, so that the output of GA_create_transaction
     // can be beed back into it as input
-    let addresses = details.get("addresses").or_else(|| details.get("addressees"));
-    ok_json!(ret, json!({ "error": "", "hex": tx_unsigned, "addresses": addresses }))
+    let addresses = details
+        .get("addresses")
+        .or_else(|| details.get("addressees"));
+    ok_json!(
+        ret,
+        json!({ "error": "", "hex": tx_unsigned, "addresses": addresses, "addressees": addresses })
+    )
 }
 
 #[no_mangle]
