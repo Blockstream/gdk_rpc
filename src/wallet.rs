@@ -10,7 +10,7 @@ use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
 use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
 use failure::Error;
-use serde_json::Value;
+use serde_json::{from_value, Value};
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
@@ -197,29 +197,30 @@ impl Wallet {
         let outs = parse_addresses(&details)?;
         debug!("create_transaction() addresses: {:?}", outs);
 
-        let tx = self
+        let unfunded_tx = self
             .rpc
             .create_raw_transaction_hex(&[], Some(&outs), None, None)?;
 
-        debug!("create_transaction tx: {:?}", tx);
+        debug!("create_transaction unfunded tx: {:?}", unfunded_tx);
 
         // TODO explicit handling for id_no_utxos_found id_no_recipients id_insufficient_funds
         // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
 
-        let funded_tx: Value = self.rpc.call("fundrawtransaction", &[json!(tx)])?;
-
-        debug!("create_transaction funded_tx: {:?}", funded_tx);
-
-        Ok(funded_tx.get("hex").req()?.as_str().req()?.to_string())
+        Ok(unfunded_tx)
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
-        let tx_hex = details.get("hex").req()?.as_str().req()?.to_string();
+        let unfunded_tx: String = from_value(details["hex"].clone())?;
+
+        let funded_tx: Value = self.rpc.call("fundrawtransaction", &[json!(unfunded_tx)])?;
+        let funded_tx: String = from_value(funded_tx["hex"].clone())?;
+
+        debug!("create_transaction funded_tx: {:?}", funded_tx);
 
         let signed_tx: Value = self
             .rpc
-            .call("signrawtransactionwithwallet", &[json!(tx_hex)])?;
+            .call("signrawtransactionwithwallet", &[json!(funded_tx)])?;
 
         if signed_tx.get("complete").req()?.as_bool().req()? == false {
             let errors = signed_tx
@@ -228,7 +229,7 @@ impl Wallet {
             bail!("the transaction cannot be signed: {}", errors)
         }
 
-        Ok(signed_tx.get("hex").req()?.as_str().req()?.to_string())
+        Ok(from_value(signed_tx["hex"].clone())?)
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
