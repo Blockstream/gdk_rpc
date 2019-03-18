@@ -408,10 +408,7 @@ fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
         .iter()
         .map(|desc| {
             let mut address = desc.get("address").req()?.as_str().req()?;
-            let value = desc
-                .get("satoshi")
-                .and_then(|s| s.as_u64())
-                .unwrap_or(100000); // XXX -- this is needed because fundrawtx won't accept it otherwise, but is dangerous
+            let value = desc.get("satoshi").and_then(|s| s.as_u64()).unwrap_or(0);
 
             debug!("make_output dest: {}, value: {}", address, value);
 

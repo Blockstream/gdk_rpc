@@ -306,7 +306,7 @@ fn a4_test_settings() {
 fn a4_send_tx() {
     let details = make_json(
         //json!({ "addresses": [ {"address":"bitcoin:2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b?amount=0.001"} ] }),
-        json!({ "addresses": [ {"address":"2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b", "satoshi": 569000}, {"address":"bitcoin:2NDU7B57ZQ7XdW2LRKCRufF4uCcYnyr4Vxp"} ] }),
+        json!({ "addresses": [ {"address":"2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b", "satoshi": 569000}, {"address":"bitcoin:2NDU7B57ZQ7XdW2LRKCRufF4uCcYnyr4Vxp", "satoshi":1000} ] }),
     );
     let mut tx_detail_unsigned: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
