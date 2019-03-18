@@ -46,7 +46,7 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_MEMO_USER, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{extend, log_filter, make_str, read_str};
+use crate::util::{log_filter, make_str, read_str};
 use crate::wallet::{
     format_addressees, generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic,
     Wallet,
@@ -109,7 +109,11 @@ macro_rules! tryit {
                 debug!("error: {:?}", err);
                 return GA_ERROR;
             }
-            Ok(x) => x,
+            Ok(x) => {
+                // can't easily print x because bitcoincore_rpc::Client is not serializable :(
+                debug!("tryit!() succeed");
+                x
+            },
         }
     };
 }
@@ -117,16 +121,20 @@ macro_rules! tryit {
 macro_rules! ok {
     ($t:expr, $x:expr) => {
         unsafe {
-            *$t = $x;
+            let x = $x;
+            debug!("ok!() {:?}", x);
+            *$t = x;
             GA_OK
         }
     };
 }
 
 macro_rules! ok_json {
-    ($t:expr, $x:expr) => {
-        ok!($t, GA_json::new(json!($x)))
-    };
+    ($t:expr, $x:expr) => {{
+        let x = json!($x);
+        debug!("ok_json!() {:?}", x);
+        ok!($t, GA_json::new(x))
+    }};
 }
 
 //
