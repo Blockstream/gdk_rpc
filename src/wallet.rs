@@ -426,7 +426,7 @@ fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
         .iter()
         .map(|desc| {
             let mut address = desc["address"].as_str().req()?;
-            let value = desc["satoshi"].as_u64().unwrap_or(0);
+            let value = desc["satoshi"].as_u64().or_err("id_no_amount_specified")?;
 
             if address.to_lowercase().starts_with("bitcoin:") {
                 address = address.split(":").nth(1).req()?;
