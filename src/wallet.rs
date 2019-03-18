@@ -310,31 +310,19 @@ impl Wallet {
         // we can't really set a tx memo, so we fake it by setting a memo on the address
 
         let txdesc: Value = self.rpc.call("gettransaction", &[json!(txid)])?;
-        debug!(
-            "set_tx_memo() for {}, memo={}, txdesc={:?}",
-            txid, memo, txdesc
-        );
 
         let address = txdesc["details"][0]["address"]
             .as_str()
             .or_err("cannot find address to attach memo")?;
-        debug!("set_tx_memo() use address {}", address);
 
-        let address_info: Value = self.rpc.call("getaddressinfo", &[json!(address)])?;
-        debug!("set_tx_memo() address info {:?}", address_info);
-        let curr_label = address_info["label"].as_str().unwrap_or("");
-
-        let new_label = if memo.starts_with(curr_label) {
-            memo.to_string()
-        } else {
-            format!("{}, {}", curr_label, memo)
-        };
-
-        debug!("set_tx_memo() change label {} => {}", curr_label, new_label);
+        debug!(
+            "set_tx_memo() for {}, memo={}, address={}",
+            txid, memo, address
+        );
 
         Ok(match self
             .rpc
-            .call::<Value>("setlabel", &[json!(address), json!(new_label)])
+            .call::<Value>("setlabel", &[json!(address), json!(memo)])
         {
             Ok(_) => Ok(()),
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
