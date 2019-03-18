@@ -199,11 +199,11 @@ impl Wallet {
         format_gdk_tx(&txdesc, tx)
     }
 
-    pub fn create_transaction(&self, details: &Value) -> Result<String, Error> {
+    pub fn create_transaction(&self, details: &Value) -> Result<(HashMap<String, f64>, String), Error> {
         debug!("create_transaction(): {:?}", details);
 
         // XXX use createrawtx?
-        let outs = parse_addresses(&details)?;
+        let outs = parse_outs(&details)?;
         debug!("create_transaction() addresses: {:?}", outs);
 
         let unfunded_tx = self
@@ -216,7 +216,7 @@ impl Wallet {
         // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
 
-        Ok(unfunded_tx)
+        Ok((outs, unfunded_tx))
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
@@ -413,7 +413,7 @@ fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     }))
 }
 
-fn parse_addresses(details: &Value) -> Result<HashMap<String, f64>, Error> {
+fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
     debug!("parse_addresses {:?}", details);
 
     Ok(details

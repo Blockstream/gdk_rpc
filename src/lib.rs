@@ -46,7 +46,7 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{log_filter, make_str, read_str};
+use crate::util::{log_filter, make_str, read_str, btc_to_usat};
 use crate::wallet::{
     generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
 };
@@ -337,9 +337,11 @@ pub extern "C" fn GA_create_transaction(
 
     // echo "addresses" back, so that the output of GA_create_transaction
     // can be beed back into it as input
-    let addresses = details
-        .get("addresses")
-        .or_else(|| details.get("addressees"));
+    let addresses: Vec<Value> = outs
+        .into_iter()
+        .map(|(address, amount)| json!({ "address": address, "satoshi": btc_to_usat(amount) }))
+        .collect();
+
     ok_json!(
         ret,
         json!({ "error": "", "hex": tx_unsigned, "addresses": addresses, "addressees": addresses })
