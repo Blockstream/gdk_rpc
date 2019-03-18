@@ -728,18 +728,22 @@ pub extern "C" fn GA_set_pin(
     _sess: *const GA_session,
     mnemonic: *const c_char,
     _pin: *const c_char,
-    _device_id: *const c_char,
+    device_id: *const c_char,
     ret: *mut *const GA_json,
 ) -> i32 {
     let mnemonic = read_str(mnemonic);
+    let device_id = read_str(device_id);
 
     // FIXME setting a PIN does not actually do anything, just a successful no-op
-    ok_json!(ret, json!({
-        "encrypted_data": mnemonic,
-        "salt": "",
-        "pin_identifier": "",
-        "__unencrypted": true
-    }))
+    ok_json!(
+        ret,
+        json!({
+            "encrypted_data": mnemonic,
+            "salt": "",
+            "pin_identifier": device_id,
+            "__unencrypted": true
+        })
+    )
 }
 
 #[no_mangle]
