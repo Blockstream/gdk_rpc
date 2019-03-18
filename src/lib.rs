@@ -46,10 +46,9 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_MEMO_USER, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{log_filter, make_str, read_str};
+use crate::util::{extend, log_filter, make_str, read_str};
 use crate::wallet::{
-    format_addressees, generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic,
-    Wallet,
+    generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
 };
 
 lazy_static! {
@@ -113,7 +112,7 @@ macro_rules! tryit {
                 // can't easily print x because bitcoincore_rpc::Client is not serializable :(
                 debug!("tryit!() succeed");
                 x
-            },
+            }
         }
     };
 }
@@ -357,9 +356,12 @@ pub extern "C" fn GA_create_transaction(
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
-    // we need to echo "addressees" back (with some extra fields), so that the
-    // output of GA_create_transactio could be beed back into it as input.
-    let addressees = tryit!(format_addressees(&details["addressees"]));
+    let res = json!({
+        "addressees": &details["addressees"],
+        "is_sweep": false,
+        "memo": "",
+        "change_subaccount": 0,
+    });
 
     let tx_unsigned = match wallet.create_transaction(&details) {
         Err(err) => {
@@ -367,7 +369,7 @@ pub extern "C" fn GA_create_transaction(
             debug!("GA_create_transaction error: {:?}", err);
             return ok_json!(
                 ret,
-                json!({ "error": err.to_string(), "addressees": addressees })
+                extend(res, json!({ "error": err.to_string() })).unwrap()
             );
         }
         Ok(x) => x,
@@ -377,7 +379,7 @@ pub extern "C" fn GA_create_transaction(
 
     ok_json!(
         ret,
-        json!({ "error": "", "hex": tx_unsigned, "addressees": addressees })
+        extend(res, json!({ "error": "", "hex": tx_unsigned })).unwrap()
     )
 }
 
