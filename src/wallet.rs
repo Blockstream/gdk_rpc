@@ -150,7 +150,7 @@ impl Wallet {
             .rpc
             .call("getbalance", &[Value::Null, json!(min_conf)])?;
 
-        Ok(self._convert_amount(btc_to_usat(balance)))
+        Ok(self._convert_satoshi(btc_to_usat(balance)))
     }
 
     pub fn get_transactions(&self, details: &Value) -> Result<Value, Error> {
@@ -297,11 +297,14 @@ impl Wallet {
 
     pub fn convert_amount(&self, details: &Value) -> Result<Value, Error> {
         // XXX should convert_amonut support negative numbers?
-        let amount = details["satoshi"].as_u64().req()?;
-        Ok(self._convert_amount(amount))
+        let amount = details["satoshi"]
+            .as_u64()
+            .or_else(|| details["btc"].as_f64().map(btc_to_usat))
+            .or_err("id_no_amount_specified")?;
+        Ok(self._convert_satoshi(amount))
     }
 
-    fn _convert_amount(&self, amount: u64) -> Value {
+    fn _convert_satoshi(&self, amount: u64) -> Value {
         let currency = "USD"; // TODO
         let exchange_rate = self.exchange_rate(currency);
         let amount_f = amount as f64;

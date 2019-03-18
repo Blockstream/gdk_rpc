@@ -46,7 +46,7 @@ use crate::constants::{GA_ERROR, GA_FALSE, GA_OK, GA_TRUE};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
-use crate::util::{btc_to_usat, log_filter, make_str, read_str};
+use crate::util::{log_filter, make_str, read_str};
 use crate::wallet::{
     generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
 };
@@ -547,8 +547,12 @@ pub extern "C" fn GA_convert_amount(
     let sess = sm.get(sess).unwrap();
     let value_details = &unsafe { &*value_details }.0;
 
+    debug!("GA_convert_amount() {:?}", value_details);
+
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let units = tryit!(wallet.convert_amount(&value_details));
+
+    debug!("GA_convert_amount() result: {:?}", units);
 
     ok_json!(ret, units)
 }
