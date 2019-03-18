@@ -335,6 +335,19 @@ impl fmt::Debug for Wallet {
     }
 }
 
+pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
+    let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+    let seed = Seed::new(&mnem, "");
+    Ok(hex::encode(seed.as_bytes()))
+}
+
+pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
+    let bytes = hex::decode(hex)?;
+    let mnem = Mnemonic::from_entropy(&bytes, Language::English)?;
+    Ok(mnem.into_phrase())
+}
+
+
 fn format_gdk_tx(txdesc: &Value, tx: Transaction) -> Result<Value, Error> {
     let rawtx = serialize(&tx);
     let amount = btc_to_isat(txdesc["amount"].as_f64().req()?);

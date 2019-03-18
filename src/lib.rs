@@ -47,7 +47,7 @@ use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
 use crate::util::{log_filter, make_str, read_str};
-use crate::wallet::Wallet;
+use crate::wallet::{Wallet, mnemonic_to_hex, hex_to_mnemonic};
 
 lazy_static! {
     static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
@@ -732,13 +732,14 @@ pub extern "C" fn GA_set_pin(
 ) -> i32 {
     let mnemonic = read_str(mnemonic);
     let device_id = read_str(device_id);
+    let mnemonic_hex = tryit!(mnemonic_to_hex(&mnemonic));
 
     // FIXME setting a PIN does not actually do anything, just a successful no-op
     ok_json!(
         ret,
         json!({
-            "encrypted_data": mnemonic,
-            "salt": "",
+            "encrypted_data": mnemonic_hex,
+            "salt": "IA==",
             "pin_identifier": device_id,
             "__unencrypted": true
         })
@@ -755,7 +756,8 @@ pub extern "C" fn GA_login_with_pin(
     let sess = sm.get_mut(sess).unwrap();
 
     let pin_data = &unsafe { &*pin_data }.0;
-    let mnemonic = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
+    let mnemonic_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
+    let mnemonic = tryit!(hex_to_mnemonic(&mnemonic_hex));
 
     let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
     tryit!(wallet.login(&mnemonic));
