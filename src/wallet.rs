@@ -61,7 +61,6 @@ impl Wallet {
         match res {
             Ok(_) => (),
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
-            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => (),
             Err(CoreError::JsonRpc(jsonrpc::error::Error::Rpc(rpc_error))) => {
                 if rpc_error.code != -5
                     || rpc_error.message
@@ -207,7 +206,7 @@ impl Wallet {
 
         let unfunded_tx = self
             .rpc
-            .create_raw_transaction_hex(&[], Some(&outs), None, None)?;
+            .create_raw_transaction_hex(&[], &outs, None, None)?;
 
         debug!("create_transaction unfunded tx: {:?}", unfunded_tx);
 
@@ -241,11 +240,11 @@ impl Wallet {
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
         let tx_hex = details["hex"].as_str().req()?;
-        Ok(self.rpc.send_raw_transaction(tx_hex)?)
+        Ok(self.rpc.send_raw_transaction(tx_hex)?.to_string())
     }
 
-    pub fn send_raw_transaction(&self, tx_hex: &String) -> Result<String, Error> {
-        Ok(self.rpc.send_raw_transaction(tx_hex)?)
+    pub fn send_raw_transaction(&self, tx_hex: &str) -> Result<String, Error> {
+        Ok(self.rpc.send_raw_transaction(tx_hex)?.to_string())
     }
 
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
@@ -341,7 +340,6 @@ impl Wallet {
         {
             Ok(_) => Ok(()),
             // https://github.com/apoelstra/rust-jsonrpc/pull/16
-            Err(CoreError::JsonRpc(jsonrpc::error::Error::NoErrorOrResult)) => Ok(()),
             Err(err) => Err(Error::from(err)),
         }?)
     }

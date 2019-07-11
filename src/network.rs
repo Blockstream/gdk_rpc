@@ -1,4 +1,4 @@
-use bitcoincore_rpc::Client;
+use bitcoincore_rpc::{Client, Auth};
 use failure::Error;
 use std::collections::HashMap;
 use std::env;
@@ -138,9 +138,8 @@ impl Network {
 
         Ok(Client::new(
             self.rpc_url.clone(),
-            Some(rpc_user),
-            Some(rpc_pass),
-        ))
+            Auth::UserPass(rpc_user, rpc_pass),
+        )?)
     }
 }
 

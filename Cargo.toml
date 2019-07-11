@@ -14,13 +14,13 @@ android_logger = ["android_log"]
 stderr_logger = ["stderrlog"]
 
 [dependencies]
-bitcoin = "0.17"
-bitcoincore-rpc = { git = "https://github.com/rust-bitcoin/rust-bitcoincore-rpc", rev = "2d48109a7dd04b5b4a93abc776488d89e3862680" }
-bitcoincore-rpc-json = "0.2"
+bitcoin = "0.18"
+#bitcoincore-rpc = "0.6.0"
+bitcoincore-rpc = { git = "git://github.com/stevenroose/rust-bitcoincore-rpc.git", branch = "devel" }
 bitcoin_hashes = { version = "0.3", features = [ "serde" ] }
 secp256k1 = { version = "0.12", features = [ "rand" ] }
 bip39 = "0.6.0-beta"
-jsonrpc = "0.10"
+jsonrpc = "0.11"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -33,6 +33,7 @@ chrono = "0.4"
 log = "0.4"
 stderrlog = { version = "0.4", optional = true }
 android_log = { version = "0.1", optional = true }
+url = "1.7.2"
 
 [profile.release]
 lto = true
