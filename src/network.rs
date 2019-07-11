@@ -1,4 +1,4 @@
-use bitcoincore_rpc::{Client, Auth};
+use bitcoincore_rpc::{Auth, Client};
 use failure::Error;
 use std::collections::HashMap;
 use std::env;

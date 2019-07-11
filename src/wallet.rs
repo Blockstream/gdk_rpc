@@ -1,10 +1,10 @@
 use hex;
 use std::collections::HashMap;
-use std::fmt;
 use std::time::{Duration, Instant};
+use std::{cell, fmt};
 
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
-use bitcoin::{consensus::serialize, Network as BNetwork, PrivateKey, Transaction};
+use bitcoin::{consensus::serialize, util::bip32, Address, Network as BNetwork, Transaction};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
@@ -15,7 +15,7 @@ use serde_json::Value;
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
 use crate::network::Network;
-use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc};
+use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -24,6 +24,9 @@ pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
     mnemonic: Option<String>,
+    xpriv: Option<bip32::ExtendedPrivKey>,
+    base_derivation_path: bip32::DerivationPath,
+    next_address_child: cell::Cell<bip32::ChildNumber>,
     tip: Option<Sha256dHash>,
     last_tx: Option<Sha256dHash>,
     cached_fees: (Value, Instant),
@@ -36,51 +39,28 @@ impl Wallet {
             network,
             rpc,
             mnemonic: None,
+            xpriv: None,
+            //TODO(stevenroose) coin type, this is bitcoin mainnet only
+            base_derivation_path: "m/44'/0'/0'/0'".parse().unwrap(),
+            next_address_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
         })
     }
 
-    pub fn register(&mut self, mnemonic: &String) -> Result<(), Error> {
+    pub fn register(&mut self, mnemonic: &str) -> Result<(), Error> {
         let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
         let seed = Seed::new(&mnem, "");
+        //TODO(stevenroose) network
+        let xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Regtest, seed.as_bytes())?;
 
-        // FIXME seed -> secret key conversion
-        let skey = secp256k1::SecretKey::from_slice(&seed.as_bytes()[0..32]).unwrap();
-
-        // TODO network
-        let bkey = PrivateKey {
-            compressed: false,
-            network: BNetwork::Testnet,
-            key: skey,
-        };
-        let wif = bkey.to_wif();
-
-        // XXX this operation is destructive and would replace any prior seed stored in bitcoin core
-        // TODO make sure the wallet is unused before doing this!
-        let args = [json!(true), json!(wif)];
-        let res: Result<Value, CoreError> = self.rpc.call("sethdseed", &args);
-
-        match res {
-            Ok(_) => (),
-            // https://github.com/apoelstra/rust-jsonrpc/pull/16
-            Err(CoreError::JsonRpc(jsonrpc::error::Error::Rpc(rpc_error))) => {
-                if rpc_error.code != -5
-                    || rpc_error.message
-                        != "Already have this key (either as an HD seed or as a loose private key)"
-                {
-                    bail!("{:?}", rpc_error)
-                }
-            }
-            Err(err) => bail!(err),
-        };
-
-        self.mnemonic = Some(mnemonic.clone());
+        self.mnemonic = Some(mnemonic.to_owned());
+        self.xpriv = Some(xpriv);
         Ok(())
     }
 
-    pub fn login(&mut self, mnemonic: &String) -> Result<(), Error> {
+    pub fn login(&mut self, mnemonic: &str) -> Result<(), Error> {
         // just as pass-through to register for now
         self.register(mnemonic)
     }
@@ -253,7 +233,29 @@ impl Wallet {
 
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
         // details: {"subaccount":0,"address_type":"csv"}
-        let address = self.rpc.get_new_address(None, None)?;
+        let child_path = self
+            .base_derivation_path
+            // external addresses
+            .child(bip32::ChildNumber::from_normal_idx(0).unwrap())
+            .child(self.next_address_child.get());
+        let child_xpriv = self.xpriv.unwrap().derive_priv(&SECP, &child_path)?;
+        let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
+        let address = Address::p2wpkh(&child_xpub.public_key, child_xpub.network);
+
+        // Tell the node to watch the new address.
+        // Since this is a newly generated address, rescanning is not required.
+        self.rpc
+            .import_address(&address, None, Some(false), Some(false))?;
+
+        // increment address counter
+        self.next_address_child
+            .set(match self.next_address_child.get() {
+                bip32::ChildNumber::Normal { index } => {
+                    bip32::ChildNumber::from_normal_idx(index + 1)?
+                }
+                _ => unreachable!(),
+            });
+
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",

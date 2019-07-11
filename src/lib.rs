@@ -111,6 +111,7 @@ macro_rules! tryit {
             }
             Ok(x) => {
                 // can't easily print x because bitcoincore_rpc::Client is not serializable :(
+                // should be fixed with https://github.com/rust-bitcoin/rust-bitcoincore-rpc/pull/51
                 debug!("tryit!() succeed");
                 x
             }
