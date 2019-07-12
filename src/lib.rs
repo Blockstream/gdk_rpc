@@ -451,16 +451,17 @@ pub extern "C" fn GA_broadcast_transaction(
 #[no_mangle]
 pub extern "C" fn GA_get_receive_address(
     sess: *const GA_session,
-    _subaccount: u32,
-    ret: *mut *const c_char,
+    addr_details: *const GA_json,
+    ret: *mut *const GA_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
+    let addr_details = &unsafe { &*addr_details }.0;
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let address = tryit!(wallet.get_receive_address());
+    let address = tryit!(wallet.get_receive_address(&addr_details));
 
-    ok!(ret, make_str(address))
+    ok_json!(ret, address)
 }
 
 //

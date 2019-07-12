@@ -67,8 +67,8 @@ extern "C" {
 
     fn GA_get_receive_address(
         sess: *const GA_session,
-        subaccount: u32,
-        ret: *mut *const c_char,
+        details: *const GA_json,
+        ret: *mut *const GA_json,
     ) -> i32;
 
     fn GA_get_balance(
@@ -352,11 +352,12 @@ fn test_balance() {
 fn test_get_address() {
     let sess = setup();
 
-    let mut recv_addr: *const c_char = std::ptr::null_mut();
+    let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
+    let mut recv_addr: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_receive_address(sess, 0, &mut recv_addr)
+        GA_get_receive_address(sess, details, &mut recv_addr)
     });
-    debug!("recv addr: {:#?}\n", read_str(recv_addr));
+    debug!("recv addr: {:#?}\n", read_json(recv_addr));
 
     teardown(sess);
 }

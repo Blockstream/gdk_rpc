@@ -248,8 +248,23 @@ impl Wallet {
         Ok(self.rpc.send_raw_transaction(tx_hex)?)
     }
 
-    pub fn get_receive_address(&self) -> Result<String, Error> {
-        Ok(self.rpc.get_new_address(None, None)?)
+    pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
+        // details: {"subaccount":0,"address_type":"csv"}
+        let address = self.rpc.get_new_address(None, None)?;
+        //  {
+        //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
+        //    "address_type": "p2wsh",
+        //    "branch": 1,
+        //    "pointer": 13,
+        //    "script": "52210338832debc5e15ce143d5cf9241147ac0019e7516d3d9569e04b0e18f3278718921025dfaa85d64963252604e1b139b40182bb859a9e2e1aa2904876c34e82158d85452ae",
+        //    "script_type": 14,
+        //    "subaccount": 0,
+        //    "subtype": null
+        //  }
+        Ok(json!({
+            "address": address,
+            "address_type": "p2wpkh",
+        }))
     }
 
     pub fn get_fee_estimates(&self) -> Option<&Value> {
