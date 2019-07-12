@@ -4,7 +4,11 @@ use std::time::{Duration, Instant};
 use std::{cell, fmt};
 
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
-use bitcoin::{consensus::serialize, util::bip32, Address, Network as BNetwork, Transaction};
+use bitcoin::{
+    consensus::{deserialize, serialize},
+    util::bip32,
+    Address, Network as BNetwork, Transaction,
+};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
@@ -26,7 +30,8 @@ pub struct Wallet {
     mnemonic: Option<String>,
     xpriv: Option<bip32::ExtendedPrivKey>,
     base_derivation_path: bip32::DerivationPath,
-    next_address_child: cell::Cell<bip32::ChildNumber>,
+    next_receive_child: cell::Cell<bip32::ChildNumber>,
+    next_change_child: cell::Cell<bip32::ChildNumber>,
     tip: Option<Sha256dHash>,
     last_tx: Option<Sha256dHash>,
     cached_fees: (Value, Instant),
@@ -42,7 +47,8 @@ impl Wallet {
             xpriv: None,
             //TODO(stevenroose) coin type, this is bitcoin mainnet only
             base_derivation_path: "m/44'/0'/0'/0'".parse().unwrap(),
-            next_address_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            next_receive_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            next_change_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
@@ -202,11 +208,14 @@ impl Wallet {
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
+        debug!("sign_transaction(): {:?}", details);
         let funded_tx: Value = self
             .rpc
             .call("fundrawtransaction", &[details["hex"].clone()])?;
 
-        debug!("create_transaction funded_tx: {:?}", funded_tx);
+        debug!("funded_tx raw: {:?}", funded_tx);
+        let unsigned_tx: Transaction = deserialize(&hex::decode(&funded_tx.to_string())?)?;
+        debug!("unsigned_tx: {:?}", unsigned_tx);
 
         let signed_tx: Value = self
             .rpc
@@ -231,31 +240,38 @@ impl Wallet {
         Ok(self.rpc.send_raw_transaction(tx_hex)?.to_string())
     }
 
-    pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
-        // details: {"subaccount":0,"address_type":"csv"}
+    /// Return the next address for the derivation and import it in Core.
+    fn next_address(&self, child_cell: &cell::Cell<bip32::ChildNumber>) -> Result<Address, Error> {
         let child_path = self
             .base_derivation_path
             // external addresses
             .child(bip32::ChildNumber::from_normal_idx(0).unwrap())
-            .child(self.next_address_child.get());
+            .child(child_cell.get());
         let child_xpriv = self.xpriv.unwrap().derive_priv(&SECP, &child_path)?;
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
         let address = Address::p2wpkh(&child_xpub.public_key, child_xpub.network);
 
         // Tell the node to watch the new address.
         // Since this is a newly generated address, rescanning is not required.
-        self.rpc
-            .import_address(&address, None, Some(false), Some(false))?;
+        self.rpc.import_address(
+            &address,
+            Some(&child_path.to_string()),
+            Some(false),
+            Some(false),
+        )?;
 
         // increment address counter
-        self.next_address_child
-            .set(match self.next_address_child.get() {
-                bip32::ChildNumber::Normal { index } => {
-                    bip32::ChildNumber::from_normal_idx(index + 1)?
-                }
-                _ => unreachable!(),
-            });
+        child_cell.set(match child_cell.get() {
+            bip32::ChildNumber::Normal { index } => bip32::ChildNumber::from_normal_idx(index + 1)?,
+            _ => unreachable!(),
+        });
+        Ok(address)
+    }
 
+    pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
+        // details: {"subaccount":0,"address_type":"csv"}
+
+        let address = self.next_address(&self.next_receive_child)?.to_string();
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",
