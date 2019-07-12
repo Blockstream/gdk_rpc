@@ -8,10 +8,11 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-use serde_json::Value;
-
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::sync;
+
+use serde_json::Value;
 
 const GA_OK: i32 = 0;
 const GA_TRUE: u32 = 1;
@@ -157,58 +158,83 @@ extern "C" {
     fn GA_destroy_session(sess: *const GA_session) -> i32;
     fn GA_destroy_string(s: *const c_char) -> i32;
 }
-#[allow(non_camel_case_types)]
-struct GA_session_ptr(*mut GA_session);
-unsafe impl Sync for GA_session_ptr {}
-
-lazy_static! {
-    static ref SESS: GA_session_ptr = {
-        let mut sess: *mut GA_session = std::ptr::null_mut();
-        assert_eq!(GA_OK, unsafe { GA_create_session(&mut sess) });
-        GA_session_ptr(sess)
-    };
-}
 
 // TODO free up resources
 // --test-threads=1
 
-#[test]
-fn a0_setup() {
-    #[cfg(feature = "stderr_logger")]
-    stderrlog::new().verbosity(3).init().unwrap();
-}
+static LOGGER: sync::Once = sync::Once::new();
 
-#[test]
-fn a0_test_notifications() {
-    let ctx = make_json(json!({ "test": "my ctx" }));
-    assert_eq!(GA_OK, unsafe {
-        GA_set_notification_handler(SESS.0, notification_handler, ctx)
+/// The test setup function.
+fn setup() -> *mut GA_session {
+    LOGGER.call_once(|| {
+        #[cfg(feature = "stderr_logger")]
+        stderrlog::new().verbosity(3).init().unwrap();
     });
-}
 
-#[test]
-fn a1_test_create_session() {
-    // the first access to SESS creates it
-    debug!("created session: {:?}", SESS.0)
-}
+    // create new session
+    let mut sess: *mut GA_session = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_create_session(&mut sess) });
 
-#[test]
-fn a2_test_connect() {
+    // connect
     let network = CString::new("regtest-cookie").unwrap();
-    assert_eq!(GA_OK, unsafe { GA_connect(SESS.0, network.as_ptr(), 5) });
+    assert_eq!(GA_OK, unsafe { GA_connect(sess, network.as_ptr(), 5) });
     debug!("connected");
-    //std::thread::sleep(std::time::Duration::from_secs(15));
+
+    sess
 }
 
-#[test]
-fn a3_test_account() {
+/// The test teardown function.
+fn teardown(sess: *mut GA_session) {
+    debug!("destroying session");
+    assert_eq!(GA_OK, unsafe { GA_destroy_session(sess) })
+}
+
+fn login(sess: *mut GA_session) {
     let hw_device = make_json(json!({ "type": "trezor" }));
     let mnemonic =
         "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
     let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_register_user(SESS.0, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
+        GA_register_user(sess, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
+    });
+
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+    let password = CString::new("").unwrap();
+    assert_eq!(GA_OK, unsafe {
+        GA_login(
+            sess,
+            hw_device,
+            mnemonic_c.as_ptr(),
+            password.as_ptr(),
+            &mut auth_handler,
+        )
+    });
+}
+
+#[test]
+fn test_notifications() {
+    let sess = setup();
+
+    let ctx = make_json(json!({ "test": "my ctx" }));
+    assert_eq!(GA_OK, unsafe {
+        GA_set_notification_handler(sess, notification_handler, ctx)
+    });
+
+    teardown(sess);
+}
+
+#[test]
+fn test_account() {
+    let sess = setup();
+
+    let hw_device = make_json(json!({ "type": "trezor" }));
+    let mnemonic =
+        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
+    let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_register_user(sess, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
     });
     debug!("register status: {:?}", get_status(auth_handler));
 
@@ -216,7 +242,7 @@ fn a3_test_account() {
     let password = CString::new("").unwrap();
     assert_eq!(GA_OK, unsafe {
         GA_login(
-            SESS.0,
+            sess,
             hw_device,
             mnemonic_c.as_ptr(),
             password.as_ptr(),
@@ -227,95 +253,120 @@ fn a3_test_account() {
 
     let mut mnemonic_r: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_mnemonic_passphrase(SESS.0, password.as_ptr(), &mut mnemonic_r)
+        GA_get_mnemonic_passphrase(sess, password.as_ptr(), &mut mnemonic_r)
     });
     let mnemonic_r = read_str(mnemonic_r);
     // FIXME turn off loggin of mnemonic (here and elsewhere)
     debug!("get_mnemonic_passphrase: {}", mnemonic_r);
     assert_eq!(mnemonic_r, mnemonic);
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_currencies() {
+fn test_currencies() {
+    let sess = setup();
+
     let mut currencies: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_available_currencies(SESS.0, &mut currencies)
+        GA_get_available_currencies(sess, &mut currencies)
     });
     debug!("currencies: {:?}\n", read_json(currencies));
 
     let details = make_json(json!({ "satoshi": 1234567 }));
     let mut units: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_convert_amount(SESS.0, details, &mut units)
+        GA_convert_amount(sess, details, &mut units)
     });
     debug!("converted units from satoshi: {:?}\n", read_json(units));
 
     let details = make_json(json!({ "btc": 0.1 }));
     let mut units: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_convert_amount(SESS.0, details, &mut units)
+        GA_convert_amount(sess, details, &mut units)
     });
     debug!("converted units from btc: {:?}\n", read_json(units));
 
     let details = make_json(json!({ "fiat": 400 }));
     let mut units: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_convert_amount(SESS.0, details, &mut units)
+        GA_convert_amount(sess, details, &mut units)
     });
     debug!("converted units from fiat: {:?}\n", read_json(units));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_estimates() {
+fn test_estimates() {
+    let sess = setup();
+    login(sess);
+
     let mut estimates: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe {
-        GA_get_fee_estimates(SESS.0, &mut estimates)
-    });
+    assert_eq!(GA_OK, unsafe { GA_get_fee_estimates(sess, &mut estimates) });
     info!("fee estimates: {:?}\n", read_json(estimates));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_subaccount() {
+fn test_subaccount() {
+    let sess = setup();
+
     let mut subaccounts: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe {
-        GA_get_subaccounts(SESS.0, &mut subaccounts)
-    });
+    assert_eq!(GA_OK, unsafe { GA_get_subaccounts(sess, &mut subaccounts) });
     debug!("subaccounts: {:#?}\n", read_json(subaccounts));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_transactions() {
+fn test_transactions() {
+    let sess = setup();
+
     let details = make_json(json!({ "page_id": 0 }));
     let mut txs: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_transactions(SESS.0, details, &mut txs)
+        GA_get_transactions(sess, details, &mut txs)
     });
     debug!("txs: {:#?}\n", read_json(txs));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_balance() {
+fn test_balance() {
+    let sess = setup();
+
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
     let mut balance: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_balance(SESS.0, details, &mut balance)
+        GA_get_balance(sess, details, &mut balance)
     });
     debug!("balance: {:#?}\n", read_json(balance));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_get_address() {
+fn test_get_address() {
+    let sess = setup();
+
     let mut recv_addr: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_receive_address(SESS.0, 0, &mut recv_addr)
+        GA_get_receive_address(sess, 0, &mut recv_addr)
     });
     debug!("recv addr: {:#?}\n", read_str(recv_addr));
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_test_settings() {
+fn test_settings() {
+    let sess = setup();
+
     let mut settings: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_get_settings(SESS.0, &mut settings) });
+    assert_eq!(GA_OK, unsafe { GA_get_settings(sess, &mut settings) });
     let mut settings = read_json(settings);
     debug!("get settings: {:#?}\n", settings);
     assert_eq!(settings.get("unit").unwrap().as_str().unwrap(), "btc");
@@ -325,32 +376,36 @@ fn a4_test_settings() {
     let settings = make_json(settings);
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_change_settings(SESS.0, settings, &mut auth_handler)
+        GA_change_settings(sess, settings, &mut auth_handler)
     });
     debug!("change settings status: {:#?}\n", get_status(auth_handler));
 
     let mut settings: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_get_settings(SESS.0, &mut settings) });
+    assert_eq!(GA_OK, unsafe { GA_get_settings(sess, &mut settings) });
     let settings = read_json(settings);
     debug!("get settings again: {:#?}\n", settings);
     assert_eq!(settings.get("unit").unwrap().as_str().unwrap(), "satoshi");
+
+    teardown(sess);
 }
 
 #[test]
-fn a4_send_tx() {
+fn send_tx() {
+    let sess = setup();
+
     let details = make_json(
         //json!({ "addresses": [ {"address":"bitcoin:2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b?amount=0.001"} ] }),
         json!({ "addresses": [ {"address":"2NFHMw7GbqnQ3kTYMrA7MnHiYDyLy4EQH6b", "satoshi": 569000}, {"address":"bitcoin:2NDU7B57ZQ7XdW2LRKCRufF4uCcYnyr4Vxp", "satoshi":1000} ] }),
     );
     let mut tx_detail_unsigned: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_create_transaction(SESS.0, details, &mut tx_detail_unsigned)
+        GA_create_transaction(sess, details, &mut tx_detail_unsigned)
     });
     debug!("create_transaction: {:#?}\n", read_json(tx_detail_unsigned));
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_sign_transaction(SESS.0, tx_detail_unsigned, &mut auth_handler)
+        GA_sign_transaction(sess, tx_detail_unsigned, &mut auth_handler)
     });
     let sign_status = get_status(auth_handler);
     debug!("sign_transaction status: {:#?}\n", sign_status);
@@ -358,7 +413,7 @@ fn a4_send_tx() {
     let tx_detail_signed = make_json(sign_status.get("result").unwrap().clone());
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_send_transaction(SESS.0, tx_detail_signed, &mut auth_handler)
+        GA_send_transaction(sess, tx_detail_signed, &mut auth_handler)
     });
     let status = get_status(auth_handler);
     debug!("send_transaction status: {:#?}\n", status);
@@ -367,25 +422,29 @@ fn a4_send_tx() {
 
     let mut loaded_tx: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_transaction_details(SESS.0, txid.as_ptr(), &mut loaded_tx)
+        GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
     });
     info!("loaded broadcasted tx: {:#?}", read_json(loaded_tx));
 
     let memo = CString::new("hello world").unwrap();
     assert_eq!(GA_OK, unsafe {
-        GA_set_transaction_memo(SESS.0, txid.as_ptr(), memo.as_ptr(), 0)
+        GA_set_transaction_memo(sess, txid.as_ptr(), memo.as_ptr(), 0)
     });
     debug!("set memo");
 
     let mut loaded_tx: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_get_transaction_details(SESS.0, txid.as_ptr(), &mut loaded_tx)
+        GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
     });
     info!("loaded tx with memo: {:?}", read_json(loaded_tx));
+
+    teardown(sess);
 }
 
 #[test]
-fn a5_test_pin() {
+fn test_pin() {
+    let sess = setup();
+
     let mnemonic =
         "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
 
@@ -395,7 +454,7 @@ fn a5_test_pin() {
     let mut pin_data: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GA_set_pin(
-            SESS.0,
+            sess,
             mnemonic.as_ptr(),
             pin.as_ptr(),
             device_id.as_ptr(),
@@ -407,25 +466,27 @@ fn a5_test_pin() {
 
     let pin_data = make_json(pin_data);
     assert_eq!(GA_OK, unsafe {
-        GA_login_with_pin(SESS.0, pin.as_ptr(), pin_data)
+        GA_login_with_pin(sess, pin.as_ptr(), pin_data)
     });
+
+    teardown(sess);
 }
 
 #[test]
-fn a6_test_destroy_session() {
-    debug!("destroying session");
-    assert_eq!(GA_OK, unsafe { GA_destroy_session(SESS.0) })
-}
+fn test_networks() {
+    let sess = setup();
 
-#[test]
-fn a6_test_networks() {
     let mut nets: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_networks(&mut nets) });
     debug!("networks: {:?}\n", read_json(nets));
+
+    teardown(sess);
 }
 
 #[test]
-fn a6_test_mnemonic() {
+fn test_mnemonic() {
+    let sess = setup();
+
     let mut mnemonic: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic) });
     let mnemonic = read_str(mnemonic);
@@ -446,14 +507,20 @@ fn a6_test_mnemonic() {
     });
     info!("invalid mnemonic is valid: {}", is_valid);
     assert_eq!(GA_FALSE, is_valid);
+
+    teardown(sess);
 }
 
 #[test]
-fn a6_test_destroy_string() {
+fn test_destroy_string() {
+    let sess = setup();
+
     let mut mnemonic: *const c_char = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic) });
 
     assert_eq!(GA_OK, unsafe { GA_destroy_string(mnemonic) });
+
+    teardown(sess);
 }
 
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
