@@ -14,12 +14,14 @@ use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::OptionExt;
+use crate::network::Network;
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc};
 
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
 pub struct Wallet {
+    network: &'static Network,
     rpc: RpcClient,
     mnemonic: Option<String>,
     tip: Option<Sha256dHash>,
@@ -28,14 +30,16 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(rpc: RpcClient) -> Self {
-        Wallet {
+    pub fn new(network: &'static Network) -> Result<Self, Error> {
+        let rpc = network.connect()?;
+        Ok(Wallet {
+            network,
             rpc,
             mnemonic: None,
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
-        }
+        })
     }
 
     pub fn register(&mut self, mnemonic: &String) -> Result<(), Error> {

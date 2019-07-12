@@ -20,9 +20,9 @@ pub struct Network {
     p2pkh_version: u32,
     p2sh_version: u32,
 
-    development: bool,
-    liquid: bool,
-    mainnet: bool,
+    pub development: bool,
+    pub liquid: bool,
+    pub mainnet: bool,
 
     tx_explorer_url: String,
     address_explorer_url: String,

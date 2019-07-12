@@ -190,8 +190,7 @@ pub extern "C" fn GA_connect(
     let network_name = read_str(network_name);
 
     let network = tryit!(Network::get(&network_name).or_err("missing network"));
-    let rpc = tryit!(network.connect());
-    let wallet = Wallet::new(rpc);
+    let wallet = tryit!(Wallet::new(network));
 
     log::set_max_level(log_filter(log_level));
 
