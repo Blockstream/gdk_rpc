@@ -6,8 +6,9 @@ use std::{cell, fmt};
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bitcoin::{
     consensus::{deserialize, serialize},
+    util::bip143,
     util::bip32,
-    Address, Network as BNetwork, Transaction,
+    Address, Network as BNetwork, Script, Transaction,
 };
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
@@ -58,8 +59,8 @@ impl Wallet {
     pub fn register(&mut self, mnemonic: &str) -> Result<(), Error> {
         let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
         let seed = Seed::new(&mnem, "");
-        //TODO(stevenroose) network
-        let xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Regtest, seed.as_bytes())?;
+        // Network isn't of importance here.
+        let xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes())?;
 
         self.mnemonic = Some(mnemonic.to_owned());
         self.xpriv = Some(xpriv);
@@ -209,26 +210,65 @@ impl Wallet {
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("sign_transaction(): {:?}", details);
-        let funded_tx: Value = self
-            .rpc
-            .call("fundrawtransaction", &[details["hex"].clone()])?;
+        let change_address = self.next_address(self.next_change_child.get())?;
+        //TODO(stevenroose) liquid
+        let fund_opts = bitcoincore_rpc::json::FundRawTransactionOptions {
+            change_address: Some(change_address.parse().unwrap()),
+            include_watching: Some(true),
+            //TODO(stevenroose) simplify after https://github.com/rust-bitcoin/rust-bitcoincore-rpc/pull/53
+            change_position: None,
+            change_type: None,
+            lock_unspents: None,
+            fee_rate: None,
+            subtract_fee_from_outputs: None,
+            replaceable: None,
+            conf_target: None,
+            estimate_mode: None,
+        };
+        debug!("hex: {}", details["hex"].as_str().unwrap());
+        let funded_result = self.rpc.fund_raw_transaction(
+            details["hex"].as_str().unwrap(),
+            Some(fund_opts),
+            None,
+        )?;
+        debug!("funded_tx raw: {:?}", hex::encode(&funded_result.hex));
 
-        debug!("funded_tx raw: {:?}", funded_tx);
-        let unsigned_tx: Transaction = deserialize(&hex::decode(&funded_tx.to_string())?)?;
+        let mut unsigned_tx: Transaction = deserialize(&funded_result.hex)?;
         debug!("unsigned_tx: {:?}", unsigned_tx);
 
-        let signed_tx: Value = self
-            .rpc
-            .call("signrawtransactionwithwallet", &[funded_tx["hex"].clone()])?;
-
-        let complete = signed_tx["complete"].as_bool().req()?;
-
-        if !complete {
-            let errors = signed_tx["errors"].to_string();
-            bail!("the transaction cannot be signed: {}", errors)
+        // Gather the details for the inputs.
+        let mut input_details = Vec::with_capacity(unsigned_tx.input.len());
+        for input in &unsigned_tx.input {
+            let prevout = input.previous_output;
+            let prevtx = self.rpc.get_transaction(&prevout.txid, Some(true))?;
+            if let Some(det) = prevtx.details.into_iter().find(|d| d.vout == prevout.vout) {
+                input_details.push(det);
+            } else {
+                bail!("transaction has unknown input: {}", prevout)
+            }
         }
 
-        Ok(signed_tx["hex"].as_str().req()?.to_string())
+        // Sign the tx.
+        let sighash_components = bip143::SighashComponents::new(&unsigned_tx);
+        for (idx, details) in input_details.into_iter().enumerate() {
+            if details.label.is_none() {
+                bail!("no label on address {}", details.address);
+            }
+            let path: bip32::DerivationPath = details.label.unwrap().parse()?;
+            let sighash = sighash_components.sighash_all(
+                &unsigned_tx.input[idx],
+                &Script::new(),
+                details.amount.into_inner() as u64,
+            );
+
+            let xpriv = self.xpriv.unwrap().derive_priv(&SECP, &path)?;
+            let pubkey = xpriv.private_key.public_key(&SECP).to_bytes();
+            let msg = secp256k1::Message::from_slice(&sighash[..])?;
+            let signature = SECP.sign(&msg, &xpriv.private_key.key).serialize_der();
+            unsigned_tx.input[idx].witness = vec![pubkey, signature];
+        }
+
+        return Ok(hex::encode(&serialize(&unsigned_tx)));
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
@@ -241,37 +281,58 @@ impl Wallet {
     }
 
     /// Return the next address for the derivation and import it in Core.
-    fn next_address(&self, child_cell: &cell::Cell<bip32::ChildNumber>) -> Result<Address, Error> {
+    fn next_address(&self, child: bip32::ChildNumber) -> Result<String, Error> {
         let child_path = self
             .base_derivation_path
             // external addresses
             .child(bip32::ChildNumber::from_normal_idx(0).unwrap())
-            .child(child_cell.get());
+            .child(child);
         let child_xpriv = self.xpriv.unwrap().derive_priv(&SECP, &child_path)?;
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
-        let address = Address::p2wpkh(&child_xpub.public_key, child_xpub.network);
 
-        // Tell the node to watch the new address.
-        // Since this is a newly generated address, rescanning is not required.
-        self.rpc.import_address(
-            &address,
-            Some(&child_path.to_string()),
-            Some(false),
-            Some(false),
-        )?;
+        let address_str: String = if self.network.liquid {
+            //TODO(stevenroose) implement
+            unimplemented!()
+        } else {
+            let address = if self.network.mainnet && !self.network.development {
+                Address::p2wpkh(&child_xpub.public_key, BNetwork::Bitcoin)
+            } else if self.network.development && !self.network.mainnet {
+                Address::p2wpkh(&child_xpub.public_key, BNetwork::Regtest)
+            } else {
+                panic!(
+                    "strange network settings: liquid={}, mainnet={}, development={}",
+                    self.network.liquid, self.network.mainnet, self.network.development
+                );
+            };
 
-        // increment address counter
+            // Tell the node to watch the new address.
+            // Since this is a newly generated address, rescanning is not required.
+            self.rpc.import_address(
+                &address,
+                Some(&child_path.to_string()),
+                Some(false),
+                Some(false),
+            )?;
+            address.to_string()
+        };
+
+        Ok(address_str)
+    }
+
+    /// Increment the bip32 child cell by one.
+    fn increment_child_cell(child_cell: &cell::Cell<bip32::ChildNumber>) -> Result<(), Error> {
         child_cell.set(match child_cell.get() {
             bip32::ChildNumber::Normal { index } => bip32::ChildNumber::from_normal_idx(index + 1)?,
             _ => unreachable!(),
         });
-        Ok(address)
+        Ok(())
     }
 
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
         // details: {"subaccount":0,"address_type":"csv"}
 
-        let address = self.next_address(&self.next_receive_child)?.to_string();
+        let address = self.next_address(self.next_receive_child.get())?;
+        Self::increment_child_cell(&self.next_receive_child)?;
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",
