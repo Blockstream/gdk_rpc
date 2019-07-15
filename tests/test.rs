@@ -8,10 +8,19 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate bitcoin;
+extern crate bitcoin_hashes;
+extern crate bitcoincore_rpc;
+extern crate secp256k1;
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::sync;
+use std::path::Path;
+use std::str::FromStr;
+use std::{env, fs, sync};
 
+use bitcoin_hashes::{sha256d};
+use bitcoincore_rpc::RpcApi;
 use serde_json::Value;
 
 const GA_OK: i32 = 0;
@@ -217,6 +226,78 @@ fn teardown(sess: *mut GA_session) {
     assert_eq!(GA_OK, unsafe { GA_destroy_session(sess) })
 }
 
+lazy_static! {
+    static ref SECP: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
+    static ref BITCOIND: bitcoincore_rpc::Client = {
+        let rpc_url = env::var("BITCOIND_URL")
+            .ok()
+            .unwrap_or_else(|| "http://127.0.0.1:18443".to_string());
+        let rpc_cookie = env::var("BITCOIND_DIR")
+            .ok()
+            .map(|p| Path::new(&p).join(".cookie").to_string_lossy().into_owned());
+        let contents = fs::read_to_string(rpc_cookie.unwrap()).unwrap();
+        let parts: Vec<&str> = contents.split(":").collect();
+        let auth = bitcoincore_rpc::Auth::UserPass(parts[0].to_string(), parts[1].to_string());
+        bitcoincore_rpc::Client::new(rpc_url, auth).unwrap()
+    };
+}
+
+const GENKEY_WIF: &str = "cSqP5fzDsrwKHkhTBPtoM447jLW8kEGo3HdG53CCiUwDEtA9Yt1J";
+const GENKEY_ADDR: &str = "mydYeZg2uSCRWk7sDsSG1BGLrQysotYTJn";
+const GENKEY_SCRIPT_PK: &str = "76a914c6b16fd4ac700cbab750d297223eb425a4ad339488ac";
+/// The block height of the last used coinbase output.
+const GENKEY_USED_IDX: sync::atomic::AtomicU32 = sync::atomic::AtomicU32::new(0);
+
+fn mine_blocks(n: u64) -> Vec<sha256d::Hash> {
+    BITCOIND.generate_to_address(n, &GENKEY_ADDR.parse().unwrap()).unwrap()
+}
+
+fn send_coins(address: &bitcoin::Address) -> sha256d::Hash {
+    let utxo_block_idx = GENKEY_USED_IDX.fetch_add(1, sync::atomic::Ordering::Relaxed) + 1;
+    let (utxo, value) = {
+        let block_hash = BITCOIND.get_block_hash(utxo_block_idx as u64).unwrap();
+        let block = BITCOIND.get_block(&block_hash).unwrap();
+        (bitcoin::OutPoint {
+            txid: block.txdata[0].txid(),
+            vout: 0,
+        }, block.txdata[0].output[0].value)
+    };
+
+    let mut tx = bitcoin::Transaction {
+        version: 1,
+        lock_time: 0,
+        input: vec![
+            bitcoin::TxIn {
+                previous_output: utxo,
+                script_sig: bitcoin::Script::new(),
+                sequence: 0xffffffff,
+                witness: vec![],
+            },
+        ],
+        output: vec![
+            bitcoin::TxOut {
+                value: value,
+                script_pubkey: address.script_pubkey(),
+            },
+        ],
+    };
+    let gen_script: bitcoin::Script = hex::decode(&GENKEY_SCRIPT_PK).unwrap().into();
+    let sighash = tx.signature_hash(0, &gen_script, bitcoin::SigHashType::All.as_u32());
+
+    let privkey = bitcoin::PrivateKey::from_str(&GENKEY_WIF).unwrap();
+    let pubkey = privkey.public_key(&SECP).to_bytes();
+    let msg = secp256k1::Message::from_slice(&sighash[..]).unwrap();
+    let signature = SECP.sign(&msg, &privkey.key).serialize_der();
+    let scriptsig = bitcoin::blockdata::script::Builder::new()
+        .push_slice(&pubkey)
+        .push_slice(&signature)
+        .into_script();
+    tx.input[0].script_sig = scriptsig;
+
+    let txid = BITCOIND.send_raw_transaction(&tx).unwrap();
+    txid
+}
+
 #[test]
 fn test_notifications() {
     let sess = setup_nologin();
@@ -397,6 +478,16 @@ fn test_settings() {
 #[test]
 fn send_tx() {
     let sess = setup();
+
+    // receive some coins first
+    let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
+    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_receive_address(sess, details, &mut recv_addr)
+    });
+    let address = read_json(recv_addr)["address"].as_str().unwrap().parse().unwrap();
+    debug!("Received coins to addr {} in txid {}", address, send_coins(&address));
+    mine_blocks(1);
 
     let details = make_json(
         // address privkeys: cTBHbKQuegSNeQuSurjy4mEGNm5ebW7Y8R9jYj11Lfc37PTej5ny -> mt9XjRweetsyCtc6HaXRohJSzvV9v796Ym
