@@ -1,5 +1,6 @@
 use hex;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 use std::{cell, fmt};
 
@@ -13,7 +14,7 @@ use bitcoin::{
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoincore_rpc::bitcoincore_rpc_json::EstimateSmartFeeResult;
-use bitcoincore_rpc::{Client as RpcClient, Error as CoreError, RpcApi};
+use bitcoincore_rpc::{Client as RpcClient, RpcApi};
 use failure::Error;
 use serde_json::Value;
 
@@ -25,14 +26,41 @@ use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat
 const PER_PAGE: u32 = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
+/// Meta-information about an address that we need to store.
+/// We use this to store multiple fields inside the address label field.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct AddressMeta {
+    pub fp: bip32::Fingerprint,
+    pub child: bip32::ChildNumber,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub memo: String,
+}
+
+impl AddressMeta {
+    /// Parse a label from Core.
+    pub fn from_label(l: Option<&String>) -> Result<AddressMeta, Error> {
+        match l {
+            Some(s) => Ok(serde_json::from_str(s)?),
+            None => bail!("Empty label on address"),
+        }
+    }
+    /// Serialize to string to save into a label.
+    pub fn to_label(&self) -> Result<String, Error> {
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
 pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
     mnemonic: Option<String>,
-    xpriv: Option<bip32::ExtendedPrivKey>,
-    base_derivation_path: bip32::DerivationPath,
-    next_receive_child: cell::Cell<bip32::ChildNumber>,
-    next_change_child: cell::Cell<bip32::ChildNumber>,
+    master_xpriv: Option<bip32::ExtendedPrivKey>,
+    /// The BIP32 extended private key for external addresses.
+    external_xpriv: Option<bip32::ExtendedPrivKey>,
+    /// The BIP32 extended private key for internal (i.e. change) addresses.
+    internal_xpriv: Option<bip32::ExtendedPrivKey>,
+    next_external_child: cell::Cell<bip32::ChildNumber>,
+    next_internal_child: cell::Cell<bip32::ChildNumber>,
     tip: Option<Sha256dHash>,
     last_tx: Option<Sha256dHash>,
     cached_fees: (Value, Instant),
@@ -45,11 +73,11 @@ impl Wallet {
             network,
             rpc,
             mnemonic: None,
-            xpriv: None,
-            //TODO(stevenroose) coin type, this is bitcoin mainnet only
-            base_derivation_path: "m/44'/0'/0'/0'".parse().unwrap(),
-            next_receive_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
-            next_change_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            master_xpriv: None,
+            external_xpriv: None,
+            internal_xpriv: None,
+            next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
@@ -63,7 +91,17 @@ impl Wallet {
         let xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes())?;
 
         self.mnemonic = Some(mnemonic.to_owned());
-        self.xpriv = Some(xpriv);
+        self.master_xpriv = Some(xpriv);
+
+        // Add BIP-44 derivations for external and internal addresses.
+        self.external_xpriv = Some(xpriv.derive_priv(
+            &SECP,
+            &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap(),
+        )?);
+        self.internal_xpriv = Some(xpriv.derive_priv(
+            &SECP,
+            &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/1").unwrap(),
+        )?);
         Ok(())
     }
 
@@ -210,7 +248,10 @@ impl Wallet {
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("sign_transaction(): {:?}", details);
-        let change_address = self.next_address(self.next_change_child.get())?;
+        let change_address = self.next_address(
+            self.internal_xpriv.as_ref().unwrap(),
+            self.next_internal_child.get(),
+        )?;
         //TODO(stevenroose) liquid
         let fund_opts = bitcoincore_rpc::json::FundRawTransactionOptions {
             change_address: Some(change_address.parse().unwrap()),
@@ -254,20 +295,28 @@ impl Wallet {
             if details.label.is_none() {
                 bail!("no label on address {}", details.address);
             }
-            let path: bip32::DerivationPath = details.label.unwrap().parse()?;
+            let label = AddressMeta::from_label(details.label.as_ref())?;
             let sighash = sighash_components.sighash_all(
                 &unsigned_tx.input[idx],
                 &Script::new(),
                 details.amount.into_inner() as u64,
             );
 
-            let xpriv = self.xpriv.unwrap().derive_priv(&SECP, &path)?;
+            let xpriv = if label.fp == self.external_xpriv.as_ref().unwrap().fingerprint(&SECP) {
+                self.external_xpriv.as_ref().unwrap()
+            } else if label.fp == self.internal_xpriv.as_ref().unwrap().fingerprint(&SECP) {
+                self.internal_xpriv.as_ref().unwrap()
+            } else {
+                bail!("address is labeled with unknown master xpriv fingerprint: {:?}", label.fp)
+            };
+            xpriv.derive_priv(&SECP, &[label.child])?;
             let pubkey = xpriv.private_key.public_key(&SECP).to_bytes();
             let msg = secp256k1::Message::from_slice(&sighash[..])?;
             let signature = SECP.sign(&msg, &xpriv.private_key.key).serialize_der();
             unsigned_tx.input[idx].witness = vec![pubkey, signature];
         }
 
+        Self::increment_child_cell(&self.next_internal_child)?;
         return Ok(hex::encode(&serialize(&unsigned_tx)));
     }
 
@@ -281,13 +330,12 @@ impl Wallet {
     }
 
     /// Return the next address for the derivation and import it in Core.
-    fn next_address(&self, child: bip32::ChildNumber) -> Result<String, Error> {
-        let child_path = self
-            .base_derivation_path
-            // external addresses
-            .child(bip32::ChildNumber::from_normal_idx(0).unwrap())
-            .child(child);
-        let child_xpriv = self.xpriv.unwrap().derive_priv(&SECP, &child_path)?;
+    fn next_address(
+        &self,
+        xpriv: &bip32::ExtendedPrivKey,
+        child: bip32::ChildNumber,
+    ) -> Result<String, Error> {
+        let child_xpriv = xpriv.derive_priv(&SECP, &[child])?;
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
 
         let address_str: String = if self.network.liquid {
@@ -307,9 +355,14 @@ impl Wallet {
 
             // Tell the node to watch the new address.
             // Since this is a newly generated address, rescanning is not required.
+            let label = AddressMeta {
+                fp: xpriv.fingerprint(&SECP),
+                child: child,
+                memo: String::new(),
+            };
             self.rpc.import_address(
                 &address,
-                Some(&child_path.to_string()),
+                Some(&label.to_label()?),
                 Some(false),
                 Some(false),
             )?;
@@ -331,8 +384,11 @@ impl Wallet {
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
         // details: {"subaccount":0,"address_type":"csv"}
 
-        let address = self.next_address(self.next_receive_child.get())?;
-        Self::increment_child_cell(&self.next_receive_child)?;
+        let address = self.next_address(
+            self.external_xpriv.as_ref().unwrap(),
+            self.next_external_child.get(),
+        )?;
+        Self::increment_child_cell(&self.next_external_child)?;
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",
