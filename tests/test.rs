@@ -165,7 +165,7 @@ extern "C" {
 static LOGGER: sync::Once = sync::Once::new();
 
 /// The test setup function.
-fn setup() -> *mut GA_session {
+fn setup_nologin() -> *mut GA_session {
     LOGGER.call_once(|| {
         #[cfg(feature = "stderr_logger")]
         stderrlog::new().verbosity(3).init().unwrap();
@@ -183,13 +183,10 @@ fn setup() -> *mut GA_session {
     sess
 }
 
-/// The test teardown function.
-fn teardown(sess: *mut GA_session) {
-    debug!("destroying session");
-    assert_eq!(GA_OK, unsafe { GA_destroy_session(sess) })
-}
+/// Setup with login.
+fn setup() -> *mut GA_session {
+    let sess = setup_nologin();
 
-fn login(sess: *mut GA_session) {
     let hw_device = make_json(json!({ "type": "trezor" }));
     let mnemonic =
         "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
@@ -210,11 +207,19 @@ fn login(sess: *mut GA_session) {
             &mut auth_handler,
         )
     });
+
+    sess
+}
+
+/// The test teardown function.
+fn teardown(sess: *mut GA_session) {
+    debug!("destroying session");
+    assert_eq!(GA_OK, unsafe { GA_destroy_session(sess) })
 }
 
 #[test]
 fn test_notifications() {
-    let sess = setup();
+    let sess = setup_nologin();
 
     let ctx = make_json(json!({ "test": "my ctx" }));
     assert_eq!(GA_OK, unsafe {
@@ -226,7 +231,7 @@ fn test_notifications() {
 
 #[test]
 fn test_account() {
-    let sess = setup();
+    let sess = setup_nologin();
 
     let hw_device = make_json(json!({ "type": "trezor" }));
     let mnemonic =
@@ -300,7 +305,6 @@ fn test_currencies() {
 #[test]
 fn test_estimates() {
     let sess = setup();
-    login(sess);
 
     let mut estimates: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_fee_estimates(sess, &mut estimates) });
