@@ -23,6 +23,7 @@ extern crate log;
 extern crate android_log;
 #[cfg(feature = "stderr_logger")]
 extern crate stderrlog;
+extern crate url;
 
 pub mod constants;
 pub mod errors;
@@ -1004,4 +1005,17 @@ pub extern "C" fn GA_get_uniform_uint32_t(_upper_bound: u32, _ret: *mut *const u
 #[no_mangle]
 pub extern "C" fn GA_get_random_bytes(_num_bytes: u32, _ret: *mut *const c_char, _len: u32) -> i32 {
     GA_ERROR
+}
+
+//
+// Unit test helper methods
+//
+
+#[no_mangle]
+pub extern "C" fn GA_test_tick(sess: *mut GA_session) -> i32 {
+    debug!("GA_test_tick()");
+    let sm = SESS_MANAGER.lock().unwrap();
+    let sess = sm.get_mut(sess).unwrap();
+    tryit!(sess.tick());
+    GA_OK
 }
