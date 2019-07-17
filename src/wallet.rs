@@ -301,7 +301,6 @@ impl Wallet {
             self.next_internal_child.get(),
         )?;
 
-        //TODO(stevenroose) remove this check
         // check listunspent
         debug!(
             "list_unspent: {:?}",
@@ -312,15 +311,7 @@ impl Wallet {
         let fund_opts = bitcoincore_rpc::json::FundRawTransactionOptions {
             change_address: Some(change_address.parse().unwrap()),
             include_watching: Some(true),
-            //TODO(stevenroose) simplify after https://github.com/rust-bitcoin/rust-bitcoincore-rpc/pull/53
-            change_position: None,
-            change_type: None,
-            lock_unspents: None,
-            fee_rate: None,
-            subtract_fee_from_outputs: None,
-            replaceable: None,
-            conf_target: None,
-            estimate_mode: None,
+            ..Default::default()
         };
         debug!("hex: {}", details["hex"].as_str().unwrap());
 
@@ -417,6 +408,7 @@ impl Wallet {
                     "sign_transaction(): signed tx is not valid: {}",
                     accept.reject_reason.unwrap()
                 );
+                // TODO(stevenroose) should we return an error??
             }
 
             Self::increment_child_cell(&self.next_internal_child)?;
