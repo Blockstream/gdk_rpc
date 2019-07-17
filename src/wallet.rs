@@ -673,7 +673,7 @@ fn format_gdk_tx(
     });
 
     Ok(json!({
-        "block_height": 1, // TODO not available in txdesc. fetch by block hash or derive from tip height and confirmations?
+        "block_height": info.blockindex.map(|i| i as i32).unwrap_or(-1),
         "created_at": fmt_time(info.time),
 
         "type": type_str,
