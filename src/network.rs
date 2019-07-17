@@ -1,9 +1,11 @@
-use bitcoincore_rpc::Client;
-use failure::Error;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
+
+use bitcoincore_rpc::{Auth, Client};
+use failure::Error;
+use url::Url;
 
 use crate::errors::OptionExt;
 
@@ -20,9 +22,9 @@ pub struct Network {
     p2pkh_version: u32,
     p2sh_version: u32,
 
-    development: bool,
-    liquid: bool,
-    mainnet: bool,
+    pub development: bool,
+    pub liquid: bool,
+    pub mainnet: bool,
 
     tx_explorer_url: String,
     address_explorer_url: String,
@@ -123,7 +125,7 @@ impl Network {
         NETWORKS.get(id)
     }
 
-    pub fn connect(&self) -> Result<Client, Error> {
+    pub fn connect(&self, wallet: Option<String>) -> Result<Client, Error> {
         let cred = self
             .rpc_cred
             .clone()
@@ -136,11 +138,12 @@ impl Network {
 
         let (rpc_user, rpc_pass) = cred;
 
-        Ok(Client::new(
-            self.rpc_url.clone(),
-            Some(rpc_user),
-            Some(rpc_pass),
-        ))
+        let mut rpc_url = Url::parse(&self.rpc_url)?;
+        if let Some(wallet) = wallet {
+            rpc_url = rpc_url.join(&format!("/wallet/{}", wallet))?;
+        }
+
+        Ok(Client::new(rpc_url.to_string(), Auth::UserPass(rpc_user, rpc_pass))?)
     }
 }
 

@@ -7,7 +7,7 @@ fi
 
 bitcoind -server=1 -regtest -daemon
 
-bitcoin-cli -regtest -rpcwait generate 102
+bitcoin-cli -regtest -rpcwait generate 200
 
 BITCOIND_DIR=~/.bitcoin/regtest \
 cargo test --features stderr_logger --all  -- --test-threads=1
