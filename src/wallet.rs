@@ -135,8 +135,7 @@ impl Wallet {
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
             next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
-            // We use the 0th child here for storing some state.
-            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(1).unwrap()),
+            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
@@ -155,7 +154,7 @@ impl Wallet {
         tmp_rpc.load_wallet(&fp)?;
 
         let rpc = network.connect(Some(fp))?;
-        let state_addr = Wallet::persistent_state_address(network.id(), &internal_xpriv);
+        let state_addr = Wallet::persistent_state_address(network.id(), &master_xpriv);
         let state = Wallet::load_persistent_state(&rpc, &state_addr)?;
         Ok(Wallet {
             network: network,
@@ -184,10 +183,10 @@ impl Wallet {
     /// Get the address to use to store persistent state.
     fn persistent_state_address(
         network: NetworkId,
-        internal_xpriv: &bip32::ExtendedPrivKey,
+        master_xpriv: &bip32::ExtendedPrivKey,
     ) -> String {
-        let child = bip32::ChildNumber::from_normal_idx(0).unwrap();
-        let child_xpriv = internal_xpriv.derive_priv(&SECP, &[child]).unwrap();
+        let child = bip32::ChildNumber::from_hardened_idx(350).unwrap();
+        let child_xpriv = master_xpriv.derive_priv(&SECP, &[child]).unwrap();
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
         match network {
             NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
@@ -202,7 +201,7 @@ impl Wallet {
             next_internal_child: self.next_internal_child.get(),
         };
 
-        let store_addr = Wallet::persistent_state_address(self.network.id(), &self.internal_xpriv);
+        let store_addr = Wallet::persistent_state_address(self.network.id(), &self.master_xpriv);
         // Generic call for liquid compat.
         self.rpc.call(
             "setlabel",
