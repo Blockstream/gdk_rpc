@@ -22,6 +22,8 @@ use crate::errors::{Error, OptionExt};
 use crate::network::{Network, NetworkId};
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
 
+type JsonMap = HashMap<String, Value>;
+
 const PER_PAGE: usize = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
@@ -52,6 +54,14 @@ impl AddressMeta {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistentWalletState {
+    #[serde(rename = "nec")]
+    next_external_child: bip32::ChildNumber,
+    #[serde(rename = "nic")]
+    next_internal_child: bip32::ChildNumber,
+}
+
 pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
@@ -79,7 +89,8 @@ impl Wallet {
             external_xpriv: None,
             internal_xpriv: None,
             next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
-            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            // We use the 0th child here for storing some state.
+            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(1).unwrap()),
             tip: None,
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
@@ -129,7 +140,62 @@ impl Wallet {
             self.register(mnemonic)?;
         }
         self.rpc = self.network.connect(Some(self.fingerprint().unwrap()))?;
+        self.load_persistent_state()?;
         Ok(())
+    }
+
+    /// Get the address to use to store persistent state.
+    fn persistent_state_address(&self) -> Result<String, Error> {
+        let child = bip32::ChildNumber::from_normal_idx(0)?;
+        let child_xpriv = self.internal_xpriv.unwrap().derive_priv(&SECP, &[child])?;
+        let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
+        match self.network.id() {
+            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
+            NetworkId::Bitcoin(bnet) => {
+                Ok(Address::p2wpkh(&child_xpub.public_key, bnet).to_string())
+            }
+        }
+    }
+
+    /// Store the persistent wallet state.
+    fn save_persistent_state(&self) -> Result<(), Error> {
+        let state = PersistentWalletState {
+            next_external_child: self.next_external_child.get(),
+            next_internal_child: self.next_internal_child.get(),
+        };
+
+        let store_addr = self.persistent_state_address()?;
+        // Generic call for liquid compat.
+        self.rpc.call(
+            "setlabel",
+            &[store_addr.into(), serde_json::to_string(&state)?.into()],
+        )?;
+        Ok(())
+    }
+
+    /// Load the persistent wallet state from the node.
+    fn load_persistent_state(&mut self) -> Result<(), Error> {
+        let store_addr = self.persistent_state_address()?;
+        let info: JsonMap = self
+            .rpc
+            .call("getaddressinfo", &[store_addr.clone().into()])?;
+        match info.get("label") {
+            None => Ok(()),
+            Some(Value::String(label)) => {
+                let state: PersistentWalletState = match serde_json::from_str(&label) {
+                    Err(_) => panic!(
+                        "corrupt persistent wallet state label (address: {}): {}",
+                        store_addr, label
+                    ),
+                    Ok(s) => s,
+                };
+
+                self.next_external_child = cell::Cell::new(state.next_external_child);
+                self.next_internal_child = cell::Cell::new(state.next_internal_child);
+                Ok(())
+            }
+            Some(_) => unreachable!(),
+        }
     }
 
     pub fn fingerprint(&self) -> Option<String> {
@@ -457,6 +523,8 @@ impl Wallet {
             bip32::ChildNumber::Normal { index } => bip32::ChildNumber::from_normal_idx(index + 1)?,
             _ => unreachable!(),
         });
+
+        self.save_persistent_state()?;
 
         Ok(address_str)
     }
