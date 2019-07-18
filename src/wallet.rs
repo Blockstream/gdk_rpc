@@ -15,11 +15,10 @@ use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d;
 use bitcoincore_rpc::json as rpcjson;
 use bitcoincore_rpc::{Client as RpcClient, RpcApi};
-use failure::Error;
 use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
-use crate::errors::OptionExt;
+use crate::errors::{Error, OptionExt};
 use crate::network::Network;
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
 
@@ -88,7 +87,7 @@ impl Wallet {
     }
 
     pub fn register(&mut self, mnemonic: &str) -> Result<(), Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
         let seed = Seed::new(&mnem, "");
         // Network isn't of importance here.
         let master_xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes())?;
@@ -109,7 +108,7 @@ impl Wallet {
             .call("createwallet", &[fp.as_str().into(), true.into()])?;
         let ret = ret.as_object().unwrap();
         if ret.contains_key("warning") && !ret["warning"].as_str().unwrap().is_empty() {
-            bail!(
+            throw!(
                 "Received warning when creating wallet {} in Core: {}",
                 fp,
                 ret["warning"]
@@ -189,7 +188,7 @@ impl Wallet {
 
     pub fn get_account(&self, subaccount: u32) -> Result<Value, Error> {
         if subaccount != 0 {
-            bail!("multi-account is unsupported");
+            throw!("multi-account is unsupported");
         }
 
         let has_transactions = self._get_transactions(1, 0)?.1;
@@ -331,7 +330,7 @@ impl Wallet {
                 let prevout = input.previous_output;
                 let prevtx = self.rpc.get_transaction(&prevout.txid, Some(true))?;
                 let details = match prevtx.details.into_iter().find(|d| d.vout == prevout.vout) {
-                    None => bail!("transaction has unknown input: {}", prevout),
+                    None => throw!("transaction has unknown input: {}", prevout),
                     Some(det) => det,
                 };
 
@@ -374,7 +373,7 @@ impl Wallet {
                 } else if fp == self.internal_xpriv.as_ref().unwrap().fingerprint(&SECP) {
                     self.internal_xpriv.as_ref().unwrap()
                 } else {
-                    bail!(
+                    throw!(
                         "address is labeled with unknown master xpriv fingerprint: {:?}",
                         label.fp
                     )
@@ -560,7 +559,7 @@ impl Wallet {
 
         let txdesc = self.rpc.get_transaction(&txid, Some(true))?;
         if txdesc.details.is_empty() {
-            bail!("Tx info for {} does not contain any details", txid);
+            throw!("Tx info for {} does not contain any details", txid);
         }
 
         // We just need any usable address label. Let's just take the first and hope Core always
@@ -610,13 +609,13 @@ impl fmt::Debug for Wallet {
 }
 
 pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
-    let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+    let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
     Ok(hex::encode(mnem.entropy()))
 }
 
 pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
     let bytes = hex::decode(hex)?;
-    let mnem = Mnemonic::from_entropy(&bytes, Language::English)?;
+    let mnem = Mnemonic::from_entropy(&bytes, Language::English).map_err(Error::Bip39)?;
     Ok(mnem.into_phrase())
 }
 
