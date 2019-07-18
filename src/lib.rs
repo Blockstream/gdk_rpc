@@ -200,15 +200,11 @@ pub extern "C" fn GA_connect(
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
-    let network_name = read_str(network_name);
-
-    let network = tryit!(Network::get(&network_name).or_err("missing network"));
-    let wallet = tryit!(Wallet::new(network));
 
     log::set_max_level(log_filter(log_level));
 
-    sess.network = Some(network_name);
-    sess.wallet = Some(wallet);
+    let network_name = read_str(network_name);
+    sess.network = Some(tryit!(Network::get(&network_name).or_err("missing network")));
 
     debug!("GA_connect() {:?}", sess);
 
@@ -239,9 +235,8 @@ pub extern "C" fn GA_register_user(
     let mnemonic = read_str(mnemonic);
 
     debug!("GA_register_user({}) {:?}", mnemonic, sess);
-
-    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
-    tryit!(wallet.register(&mnemonic));
+    let network = tryit!(sess.network.or_err("session not connected"));
+    sess.wallet = Some(tryit!(Wallet::register(network, &mnemonic)));
 
     ok!(ret, GA_auth_handler::success())
 }
@@ -264,9 +259,8 @@ pub extern "C" fn GA_login(
     }
 
     debug!("GA_login({}) {:?}", mnemonic, sess);
-
-    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
-    tryit!(wallet.login(&mnemonic));
+    let network = tryit!(sess.network.or_err("session not connected"));
+    sess.wallet = Some(tryit!(Wallet::login(network, &mnemonic)));
 
     tryit!(sess.hello());
 
@@ -539,10 +533,7 @@ pub extern "C" fn GA_get_mnemonic_passphrase(
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-
-    let mnemonic = tryit!(wallet.mnemonic().or_err("mnemonic unavailable"));
-
-    ok!(ret, make_str(mnemonic))
+    ok!(ret, make_str(wallet.mnemonic()))
 }
 
 //
@@ -839,10 +830,10 @@ pub extern "C" fn GA_login_with_pin(
     let pin_data = &unsafe { &*pin_data }.0;
     let mnemonic_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
     let mnemonic = tryit!(hex_to_mnemonic(&mnemonic_hex));
-    debug!("GA_login_with_pin mnemonic: {}", mnemonic);
 
-    let wallet = tryit!(sess.wallet_mut().or_err("no loaded wallet"));
-    tryit!(wallet.login(&mnemonic));
+    debug!("GA_login_with_pin mnemonic: {}", mnemonic);
+    let network = tryit!(sess.network.or_err("session not connected"));
+    sess.wallet = Some(tryit!(Wallet::login(network, &mnemonic)));
 
     tryit!(sess.hello());
 

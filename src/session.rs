@@ -7,6 +7,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::errors::Error;
+use crate::network::Network;
 use crate::settings::Settings;
 use crate::wallet::Wallet;
 use crate::GA_json;
@@ -15,7 +16,7 @@ use crate::GA_json;
 #[repr(C)]
 pub struct GA_session {
     pub settings: Settings,
-    pub network: Option<String>,
+    pub network: Option<&'static Network>,
     pub wallet: Option<Wallet>,
     pub notify: Option<(
         extern "C" fn(*const libc::c_void, *const GA_json),

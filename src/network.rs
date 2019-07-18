@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::errors::{Error, OptionExt};
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Network {
     name: String,
     network: String,
@@ -115,6 +115,7 @@ lazy_static! {
     };
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetworkId {
     Liquid,
     Bitcoin(bitcoin::Network),

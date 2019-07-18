@@ -65,12 +65,11 @@ struct PersistentWalletState {
 pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
-    mnemonic: Option<String>,
-    master_xpriv: Option<bip32::ExtendedPrivKey>,
+    mnemonic: String,
     /// The BIP32 extended private key for external addresses.
-    external_xpriv: Option<bip32::ExtendedPrivKey>,
+    external_xpriv: bip32::ExtendedPrivKey,
     /// The BIP32 extended private key for internal (i.e. change) addresses.
-    internal_xpriv: Option<bip32::ExtendedPrivKey>,
+    internal_xpriv: bip32::ExtendedPrivKey,
     next_external_child: cell::Cell<bip32::ChildNumber>,
     next_internal_child: cell::Cell<bip32::ChildNumber>,
     tip: Option<sha256d::Hash>,
@@ -79,44 +78,47 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(network: &'static Network) -> Result<Self, Error> {
-        let rpc = network.connect(None)?;
-        Ok(Wallet {
-            network,
-            rpc: rpc,
-            mnemonic: None,
-            master_xpriv: None,
-            external_xpriv: None,
-            internal_xpriv: None,
-            next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
-            // We use the 0th child here for storing some state.
-            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(1).unwrap()),
-            tip: None,
-            last_tx: None,
-            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
-        })
+    /// Calculates the bip32 seeds from the mnemonic phrase.
+    /// In order are returned:
+    /// - the master xpriv
+    /// - the external address xpriv
+    /// - the internal address xpriv
+    fn calc_seeds(
+        mnemonic: &Mnemonic,
+    ) -> (
+        bip32::ExtendedPrivKey,
+        bip32::ExtendedPrivKey,
+        bip32::ExtendedPrivKey,
+    ) {
+        let seed = Seed::new(&mnemonic, "");
+        // Network isn't of importance here.
+        let master_xpriv =
+            bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes()).unwrap();
+        // Add BIP-44 derivations for external and internal addresses.
+        let external_xpriv = master_xpriv
+            .derive_priv(
+                &SECP,
+                &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap(),
+            )
+            .unwrap();
+        let internal_xpriv = master_xpriv
+            .derive_priv(
+                &SECP,
+                &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/1").unwrap(),
+            )
+            .unwrap();
+        (master_xpriv, external_xpriv, internal_xpriv)
     }
 
-    pub fn register(&mut self, mnemonic: &str) -> Result<(), Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
-        let seed = Seed::new(&mnem, "");
-        // Network isn't of importance here.
-        let master_xpriv = bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes())?;
-        // Add BIP-44 derivations for external and internal addresses.
-        let external_xpriv = master_xpriv.derive_priv(
-            &SECP,
-            &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap(),
-        )?;
-        let internal_xpriv = master_xpriv.derive_priv(
-            &SECP,
-            &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/1").unwrap(),
-        )?;
+    /// Register a new [Wallet].
+    pub fn register(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
+        let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
         // create the wallet in Core
-        let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
-        let ret: Value = self
-            .rpc
-            .call("createwallet", &[fp.as_str().into(), true.into()])?;
+        let tmp_rpc = network.connect(None)?;
+        let ret: Value = tmp_rpc.call("createwallet", &[fp.as_str().into(), true.into()])?;
         let ret = ret.as_object().unwrap();
         if ret.contains_key("warning") && !ret["warning"].as_str().unwrap().is_empty() {
             throw!(
@@ -126,34 +128,57 @@ impl Wallet {
             );
         }
 
-        self.mnemonic = Some(mnemonic.to_owned());
-        self.master_xpriv = Some(master_xpriv);
-        self.external_xpriv = Some(external_xpriv);
-        self.internal_xpriv = Some(internal_xpriv);
-        self.rpc = self.network.connect(Some(self.fingerprint().unwrap()))?;
-        Ok(())
+        let wallet = Wallet {
+            network: network,
+            rpc: network.connect(Some(fp))?,
+            mnemonic: mnemonic.to_owned(),
+            external_xpriv: external_xpriv,
+            internal_xpriv: internal_xpriv,
+            next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
+            // We use the 0th child here for storing some state.
+            next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(1).unwrap()),
+            tip: None,
+            last_tx: None,
+            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
+        };
+        wallet.save_persistent_state()?;
+        Ok(wallet)
     }
 
-    pub fn login(&mut self, mnemonic: &str) -> Result<(), Error> {
-        if self.mnemonic.is_none() {
-            // just as pass-through to register for now
-            self.register(mnemonic)?;
-        }
-        self.rpc = self.network.connect(Some(self.fingerprint().unwrap()))?;
-        self.load_persistent_state()?;
-        Ok(())
+    /// Login to an existing [Wallet].
+    pub fn login(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
+        let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
+
+        let rpc = network.connect(Some(fp))?;
+        let state_addr = Wallet::persistent_state_address(network.id(), &internal_xpriv);
+        let state = Wallet::load_persistent_state(&rpc, &state_addr)?;
+        Ok(Wallet {
+            network: network,
+            rpc: rpc,
+            mnemonic: mnemonic.to_owned(),
+            external_xpriv: external_xpriv,
+            internal_xpriv: internal_xpriv,
+            next_external_child: cell::Cell::new(state.next_external_child),
+            next_internal_child: cell::Cell::new(state.next_internal_child),
+            tip: None,
+            last_tx: None,
+            cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
+        })
     }
 
     /// Get the address to use to store persistent state.
-    fn persistent_state_address(&self) -> Result<String, Error> {
-        let child = bip32::ChildNumber::from_normal_idx(0)?;
-        let child_xpriv = self.internal_xpriv.unwrap().derive_priv(&SECP, &[child])?;
+    fn persistent_state_address(
+        network: NetworkId,
+        internal_xpriv: &bip32::ExtendedPrivKey,
+    ) -> String {
+        let child = bip32::ChildNumber::from_normal_idx(0).unwrap();
+        let child_xpriv = internal_xpriv.derive_priv(&SECP, &[child]).unwrap();
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
-        match self.network.id() {
+        match network {
             NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
-            NetworkId::Bitcoin(bnet) => {
-                Ok(Address::p2wpkh(&child_xpub.public_key, bnet).to_string())
-            }
+            NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
         }
     }
 
@@ -164,7 +189,7 @@ impl Wallet {
             next_internal_child: self.next_internal_child.get(),
         };
 
-        let store_addr = self.persistent_state_address()?;
+        let store_addr = Wallet::persistent_state_address(self.network.id(), &self.internal_xpriv);
         // Generic call for liquid compat.
         self.rpc.call(
             "setlabel",
@@ -174,50 +199,32 @@ impl Wallet {
     }
 
     /// Load the persistent wallet state from the node.
-    fn load_persistent_state(&mut self) -> Result<(), Error> {
-        let store_addr = self.persistent_state_address()?;
-        let info: JsonMap = self
-            .rpc
-            .call("getaddressinfo", &[store_addr.clone().into()])?;
+    fn load_persistent_state(
+        rpc: &bitcoincore_rpc::Client,
+        state_addr: &str,
+    ) -> Result<PersistentWalletState, Error> {
+        let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
-            None => Ok(()),
-            Some(Value::String(label)) => {
-                let state: PersistentWalletState = match serde_json::from_str(&label) {
+            //TODO(stevenroose) use a custom error struct
+            None => bail!("wallet not initialized!"),
+            Some(Value::String(label)) => Ok(
+                match serde_json::from_str::<PersistentWalletState>(&label) {
                     Err(_) => panic!(
                         "corrupt persistent wallet state label (address: {}): {}",
-                        store_addr, label
+                        state_addr, label
                     ),
                     Ok(s) => s,
-                };
-
-                self.next_external_child = cell::Cell::new(state.next_external_child);
-                self.next_internal_child = cell::Cell::new(state.next_internal_child);
-                Ok(())
-            }
+                },
+            ),
             Some(_) => unreachable!(),
         }
     }
 
-    pub fn fingerprint(&self) -> Option<String> {
-        // we can simply use to_string after this PR is merged:
-        // https://github.com/rust-bitcoin/rust-bitcoin/pull/271
-        self.master_xpriv
-            .map(|x| hex::encode(x.fingerprint(&SECP).as_bytes()))
-    }
-
-    pub fn is_ready(&self) -> bool {
-        self.mnemonic.is_some()
-    }
-
-    pub fn mnemonic(&self) -> Option<String> {
+    pub fn mnemonic(&self) -> String {
         self.mnemonic.clone()
     }
 
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
-        if !self.is_ready() {
-            return Ok(vec![]);
-        }
-
         let mut msgs = vec![];
 
         // check for new blocks
@@ -361,10 +368,7 @@ impl Wallet {
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("sign_transaction(): {:?}", details);
-        let change_address = self.next_address(
-            self.internal_xpriv.as_ref().unwrap(),
-            &self.next_internal_child,
-        )?;
+        let change_address = self.next_address(&self.internal_xpriv, &self.next_internal_child)?;
 
         // check listunspent
         debug!(
@@ -434,10 +438,10 @@ impl Wallet {
                     );
                 }
                 let fp = label.fp.unwrap();
-                let xpriv = if fp == self.external_xpriv.as_ref().unwrap().fingerprint(&SECP) {
-                    self.external_xpriv.as_ref().unwrap()
-                } else if fp == self.internal_xpriv.as_ref().unwrap().fingerprint(&SECP) {
-                    self.internal_xpriv.as_ref().unwrap()
+                let xpriv = if fp == self.external_xpriv.fingerprint(&SECP) {
+                    self.external_xpriv
+                } else if fp == self.internal_xpriv.fingerprint(&SECP) {
+                    self.internal_xpriv
                 } else {
                     throw!(
                         "address is labeled with unknown master xpriv fingerprint: {:?}",
@@ -532,10 +536,7 @@ impl Wallet {
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
         // details: {"subaccount":0,"address_type":"csv"}
 
-        let address = self.next_address(
-            self.external_xpriv.as_ref().unwrap(),
-            &self.next_external_child,
-        )?;
+        let address = self.next_address(&self.external_xpriv, &self.next_external_child)?;
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",

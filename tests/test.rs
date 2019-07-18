@@ -641,6 +641,68 @@ fn test_destroy_string() {
     teardown(sess);
 }
 
+#[test]
+fn test_persist_wallet() {
+    //! We're gonna login and request a new receive address twice in
+    //! different sessions with the same account (mnemonic) and make sure
+    //! they are not identical.
+    let sess = setup_nologin();
+
+    // Some variables that we reuse.
+    let mnemonic = bip39::Mnemonic::new(bip39::MnemonicType::Words12, bip39::Language::English);
+    let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
+    let hw_device = make_json(json!({ "type": "trezor" }));
+    let password = CString::new("").unwrap();
+    let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
+
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_register_user(sess, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
+    });
+
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_login(
+            sess,
+            hw_device,
+            mnemonic_c.as_ptr(),
+            password.as_ptr(),
+            &mut auth_handler,
+        )
+    });
+
+    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_receive_address(sess, details, &mut recv_addr)
+    });
+    let first_addr = read_json(recv_addr);
+
+    teardown(sess);
+    let sess = setup_nologin();
+
+    let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_login(
+            sess,
+            hw_device,
+            mnemonic_c.as_ptr(),
+            password.as_ptr(),
+            &mut auth_handler,
+        )
+    });
+
+    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_get_receive_address(sess, details, &mut recv_addr)
+    });
+    let second_addr = read_json(recv_addr);
+
+    assert_ne!(first_addr, second_addr);
+    assert_ne!(first_addr["address"], second_addr["address"]);
+
+    teardown(sess);
+}
+
 extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
     info!(
         "notification handler called: {:?} -- {:?}",
