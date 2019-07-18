@@ -314,7 +314,7 @@ impl Wallet {
                 format_gdk_tx(
                     &tx,
                     desc.detail.amount.into_inner(),
-                    desc.detail.fee.unwrap().into_inner(),
+                    desc.detail.fee.map(|a| a.into_inner()).unwrap_or(0),
                     &desc.info,
                     &[&desc.detail],
                 )
