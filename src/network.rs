@@ -115,6 +115,11 @@ lazy_static! {
     };
 }
 
+pub enum NetworkId {
+    Liquid,
+    Bitcoin(bitcoin::Network),
+}
+
 impl Network {
     pub fn list() -> &'static HashMap<String, Network> {
         &NETWORKS
@@ -146,6 +151,18 @@ impl Network {
             rpc_url.to_string(),
             Auth::UserPass(rpc_user, rpc_pass),
         )?)
+    }
+
+    pub fn id(&self) -> NetworkId {
+        match (self.liquid, self.mainnet, self.development) {
+            (true, _, _) => NetworkId::Liquid,
+            (_, true, false) => NetworkId::Bitcoin(bitcoin::Network::Bitcoin),
+            (_, false, true) => NetworkId::Bitcoin(bitcoin::Network::Regtest),
+            (l, m, d) => panic!(
+                "inconsistent network parameters: lq={}, main={}, dev={}",
+                l, m, d
+            ),
+        }
     }
 }
 
