@@ -1,13 +1,12 @@
-use chrono::NaiveDateTime;
-use failure::Error;
-use log::LevelFilter;
-use serde_json::Value;
-
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+use chrono::NaiveDateTime;
+use log::LevelFilter;
+use serde_json::Value;
+
 use crate::constants::{GA_DEBUG, GA_INFO, GA_NONE, SAT_PER_BTC};
-use crate::errors::OptionExt;
+use crate::errors::{Error, OptionExt};
 
 lazy_static! {
     pub static ref SECP: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();

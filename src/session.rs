@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use failure::Error;
 use serde_json::Value;
 
+use crate::errors::Error;
 use crate::settings::Settings;
 use crate::wallet::Wallet;
 use crate::GA_json;
@@ -87,21 +87,24 @@ impl SessionManager {
     }
 
     pub fn get(&self, sess: *const GA_session) -> Result<&GA_session, Error> {
-        ensure!(
-            self.sessions.contains(&(sess as *mut GA_session)),
-            "session is unmanaged"
-        );
+        if !self.sessions.contains(&(sess as *mut GA_session)) {
+            throw!("session is unmanaged");
+        };
         Ok(unsafe { &*sess })
     }
 
     pub fn get_mut(&self, sess: *mut GA_session) -> Result<&mut GA_session, Error> {
-        ensure!(self.sessions.contains(&sess), "session is unmanaged");
+        if !self.sessions.contains(&sess) {
+            throw!("session is unmanaged");
+        }
         Ok(unsafe { &mut *sess })
     }
 
     pub fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
         debug!("SessionManager::remove({:?})", sess);
-        ensure!(self.sessions.remove(&sess), "session is unmanaged");
+        if !self.sessions.remove(&sess) {
+            throw!("session is unmanaged");
+        }
         unsafe { drop(&*sess) };
         Ok(())
     }

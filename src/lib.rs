@@ -26,6 +26,7 @@ extern crate stderrlog;
 extern crate url;
 
 pub mod constants;
+#[macro_use]
 pub mod errors;
 pub mod network;
 pub mod session;

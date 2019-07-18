@@ -4,10 +4,9 @@ use std::fs;
 use std::path::Path;
 
 use bitcoincore_rpc::{Auth, Client};
-use failure::Error;
 use url::Url;
 
-use crate::errors::OptionExt;
+use crate::errors::{Error, OptionExt};
 
 #[derive(Serialize)]
 pub struct Network {
