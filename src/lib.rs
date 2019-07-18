@@ -267,9 +267,19 @@ pub extern "C" fn GA_login(
         return GA_ERROR;
     }
 
-    debug!("GA_login({}) {:?}", mnemonic, sess);
-    let network = tryit!(sess.network.or_err("session not connected"));
-    sess.wallet = Some(tryit!(Wallet::login(network, &mnemonic)));
+    if let Some(ref wallet) = sess.wallet {
+        if wallet.mnemonic() != mnemonic {
+            warn!("user called login but was already logged-in");
+            return GA_ERROR;
+        } else {
+            // Here we silently do nothing because the user is already logged in.
+            // This happens when a user calls register.
+        }
+    } else {
+        debug!("GA_login({}) {:?}", mnemonic, sess);
+        let network = tryit!(sess.network.or_err("session not connected"));
+        sess.wallet = Some(tryit!(Wallet::login(network, &mnemonic)));
+    }
 
     tryit!(sess.hello());
 

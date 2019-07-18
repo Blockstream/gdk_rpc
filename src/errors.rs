@@ -14,14 +14,19 @@ use url;
 pub const GDK_ERROR_ID_UNKNOWN: &'static str = "id_unknown";
 
 const CORE_INSUFFICIENT_FUNDS: i32 = -1;
+const CORE_WALLET_GENERIC: i32 = -4;
 
 #[derive(Debug)]
 pub enum Error {
     // First we specify exact errors that map GDK errors.
     /// There were insufficient funds.
     InsufficientFunds,
+    /// User is already logged in.
+    AlreadyLoggedIn,
     /// User tried logging into a wallet that was not registered yet.
     WalletNotRegistered,
+    /// User tried to register a wallet that was already registered.
+    WalletAlreadyRegistered,
 
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),
@@ -68,12 +73,18 @@ impl From<bitcoincore_rpc::Error> for Error {
             bitcoincore_rpc::Error::JsonRpc(ref e) => match e {
                 jsonrpc::Error::Rpc(ref e) => match e.code {
                     CORE_INSUFFICIENT_FUNDS => return Error::InsufficientFunds,
+                    CORE_WALLET_GENERIC => {
+                        if e.message.contains("Duplicate -wallet filename specified.") {
+                            return Error::AlreadyLoggedIn;
+                        }
+                    }
                     _ => {}
                 },
                 _ => {}
             },
             _ => {}
         }
+
         Error::BitcoinRpc(e)
     }
 }
