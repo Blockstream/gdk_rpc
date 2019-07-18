@@ -188,6 +188,14 @@ pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_destroy_session(sess: *mut GA_session) -> i32 {
     let mut sm = SESS_MANAGER.lock().unwrap();
+    {
+        // Make sure the wallet is logged out.
+        let sess = sm.get_mut(sess).unwrap();
+        if let Some(wallet) = sess.wallet.take() {
+            tryit!(wallet.logout());
+        }
+    }
+
     tryit!(sm.remove(sess));
     GA_OK
 }
@@ -216,8 +224,9 @@ pub extern "C" fn GA_disconnect(sess: *mut GA_session) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
     sess.network = None;
-    // TODO cleanup rpc connection
-    sess.wallet = None;
+    if let Some(wallet) = sess.wallet.take() {
+        tryit!(wallet.logout());
+    }
     debug!("GA_disconnect() {:?}", sess);
     GA_OK
 }

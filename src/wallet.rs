@@ -66,6 +66,7 @@ pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
     mnemonic: String,
+    master_xpriv: bip32::ExtendedPrivKey,
     /// The BIP32 extended private key for external addresses.
     external_xpriv: bip32::ExtendedPrivKey,
     /// The BIP32 extended private key for internal (i.e. change) addresses.
@@ -118,13 +119,11 @@ impl Wallet {
 
         // create the wallet in Core
         let tmp_rpc = network.connect(None)?;
-        let ret: Value = tmp_rpc.call("createwallet", &[fp.as_str().into(), true.into()])?;
-        let ret = ret.as_object().unwrap();
-        if ret.contains_key("warning") && !ret["warning"].as_str().unwrap().is_empty() {
-            throw!(
+        if let Some(warning) = tmp_rpc.create_wallet(fp.as_str(), Some(true))?.warning {
+            bail!(
                 "Received warning when creating wallet {} in Core: {}",
                 fp,
-                ret["warning"]
+                warning,
             );
         }
 
@@ -132,6 +131,7 @@ impl Wallet {
             network: network,
             rpc: network.connect(Some(fp))?,
             mnemonic: mnemonic.to_owned(),
+            master_xpriv: master_xpriv,
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
             next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
@@ -151,6 +151,9 @@ impl Wallet {
         let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
         let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
+        let tmp_rpc = network.connect(None)?;
+        tmp_rpc.load_wallet(&fp)?;
+
         let rpc = network.connect(Some(fp))?;
         let state_addr = Wallet::persistent_state_address(network.id(), &internal_xpriv);
         let state = Wallet::load_persistent_state(&rpc, &state_addr)?;
@@ -158,6 +161,7 @@ impl Wallet {
             network: network,
             rpc: rpc,
             mnemonic: mnemonic.to_owned(),
+            master_xpriv: master_xpriv,
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
             next_external_child: cell::Cell::new(state.next_external_child),
@@ -166,6 +170,15 @@ impl Wallet {
             last_tx: None,
             cached_fees: (Value::Null, Instant::now() - FEE_ESTIMATES_TTL * 2),
         })
+    }
+
+    pub fn fingerprint(&self) -> bip32::Fingerprint {
+        self.master_xpriv.fingerprint(&SECP)
+    }
+
+    pub fn logout(self) -> Result<(), Error> {
+        self.rpc.unload_wallet(None)?;
+        Ok(())
     }
 
     /// Get the address to use to store persistent state.
