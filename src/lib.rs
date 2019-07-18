@@ -374,7 +374,7 @@ pub extern "C" fn GA_create_transaction(
             debug!("GA_create_transaction error: {:?}", err);
             return ok_json!(
                 ret,
-                extend(res, json!({ "error": err.to_string() })).unwrap()
+                extend(res, json!({ "error": err.to_gdk_code() })).unwrap()
             );
         }
         Ok(x) => x,
