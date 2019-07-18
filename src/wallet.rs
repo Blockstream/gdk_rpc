@@ -79,6 +79,58 @@ pub struct Wallet {
 }
 
 impl Wallet {
+    /// Get the address to use to store persistent state.
+    fn persistent_state_address(
+        network: NetworkId,
+        master_xpriv: &bip32::ExtendedPrivKey,
+    ) -> String {
+        let child = bip32::ChildNumber::from_hardened_idx(350).unwrap();
+        let child_xpriv = master_xpriv.derive_priv(&SECP, &[child]).unwrap();
+        let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
+        match network {
+            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
+            NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
+        }
+    }
+
+    /// Store the persistent wallet state.
+    fn save_persistent_state(&self) -> Result<(), Error> {
+        let state = PersistentWalletState {
+            next_external_child: self.next_external_child.get(),
+            next_internal_child: self.next_internal_child.get(),
+        };
+
+        let store_addr = Wallet::persistent_state_address(self.network.id(), &self.master_xpriv);
+        // Generic call for liquid compat.
+        self.rpc.call(
+            "setlabel",
+            &[store_addr.into(), serde_json::to_string(&state)?.into()],
+        )?;
+        Ok(())
+    }
+
+    /// Load the persistent wallet state from the node.
+    fn load_persistent_state(
+        rpc: &bitcoincore_rpc::Client,
+        state_addr: &str,
+    ) -> Result<PersistentWalletState, Error> {
+        let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
+        match info.get("label") {
+            //TODO(stevenroose) use a custom error struct
+            None => bail!("wallet not initialized!"),
+            Some(Value::String(label)) => Ok(
+                match serde_json::from_str::<PersistentWalletState>(&label) {
+                    Err(_) => panic!(
+                        "corrupt persistent wallet state label (address: {}): {}",
+                        state_addr, label
+                    ),
+                    Ok(s) => s,
+                },
+            ),
+            Some(_) => unreachable!(),
+        }
+    }
+
     /// Calculates the bip32 seeds from the mnemonic phrase.
     /// In order are returned:
     /// - the master xpriv
@@ -178,58 +230,6 @@ impl Wallet {
     pub fn logout(self) -> Result<(), Error> {
         self.rpc.unload_wallet(None)?;
         Ok(())
-    }
-
-    /// Get the address to use to store persistent state.
-    fn persistent_state_address(
-        network: NetworkId,
-        master_xpriv: &bip32::ExtendedPrivKey,
-    ) -> String {
-        let child = bip32::ChildNumber::from_hardened_idx(350).unwrap();
-        let child_xpriv = master_xpriv.derive_priv(&SECP, &[child]).unwrap();
-        let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
-        match network {
-            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
-            NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
-        }
-    }
-
-    /// Store the persistent wallet state.
-    fn save_persistent_state(&self) -> Result<(), Error> {
-        let state = PersistentWalletState {
-            next_external_child: self.next_external_child.get(),
-            next_internal_child: self.next_internal_child.get(),
-        };
-
-        let store_addr = Wallet::persistent_state_address(self.network.id(), &self.master_xpriv);
-        // Generic call for liquid compat.
-        self.rpc.call(
-            "setlabel",
-            &[store_addr.into(), serde_json::to_string(&state)?.into()],
-        )?;
-        Ok(())
-    }
-
-    /// Load the persistent wallet state from the node.
-    fn load_persistent_state(
-        rpc: &bitcoincore_rpc::Client,
-        state_addr: &str,
-    ) -> Result<PersistentWalletState, Error> {
-        let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
-        match info.get("label") {
-            //TODO(stevenroose) use a custom error struct
-            None => bail!("wallet not initialized!"),
-            Some(Value::String(label)) => Ok(
-                match serde_json::from_str::<PersistentWalletState>(&label) {
-                    Err(_) => panic!(
-                        "corrupt persistent wallet state label (address: {}): {}",
-                        state_addr, label
-                    ),
-                    Ok(s) => s,
-                },
-            ),
-            Some(_) => unreachable!(),
-        }
     }
 
     pub fn mnemonic(&self) -> String {
