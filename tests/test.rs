@@ -177,7 +177,6 @@ extern "C" {
 // --test-threads=1
 
 static LOGGER: sync::Once = sync::Once::new();
-static WALLET_COUNT: sync::atomic::AtomicU32 = sync::atomic::AtomicU32::new(0);
 
 /// The test setup function.
 fn setup_nologin() -> *mut GA_session {
