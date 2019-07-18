@@ -19,7 +19,7 @@ use serde_json::Value;
 
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::{Error, OptionExt};
-use crate::network::Network;
+use crate::network::{Network, NetworkId};
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
 
 const PER_PAGE: usize = 30;
@@ -297,7 +297,7 @@ impl Wallet {
         debug!("sign_transaction(): {:?}", details);
         let change_address = self.next_address(
             self.internal_xpriv.as_ref().unwrap(),
-            self.next_internal_child.get(),
+            &self.next_internal_child,
         )?;
 
         // check listunspent
@@ -410,7 +410,6 @@ impl Wallet {
                 // TODO(stevenroose) should we return an error??
             }
 
-            Self::increment_child_cell(&self.next_internal_child)?;
             return Ok(hex::encode(&serialize(&unsigned_tx)));
         }
     }
@@ -428,51 +427,38 @@ impl Wallet {
     fn next_address(
         &self,
         xpriv: &bip32::ExtendedPrivKey,
-        child: bip32::ChildNumber,
+        child: &cell::Cell<bip32::ChildNumber>,
     ) -> Result<String, Error> {
-        let child_xpriv = xpriv.derive_priv(&SECP, &[child])?;
+        let child_xpriv = xpriv.derive_priv(&SECP, &[child.get()])?;
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
 
-        let address_str: String = if self.network.liquid {
-            //TODO(stevenroose) implement
-            unimplemented!()
-        } else {
-            let address = if self.network.mainnet && !self.network.development {
-                Address::p2wpkh(&child_xpub.public_key, BNetwork::Bitcoin)
-            } else if self.network.development && !self.network.mainnet {
-                Address::p2wpkh(&child_xpub.public_key, BNetwork::Regtest)
-            } else {
-                panic!(
-                    "strange network settings: liquid={}, mainnet={}, development={}",
-                    self.network.liquid, self.network.mainnet, self.network.development
-                );
-            };
+        let address_str = match self.network.id() {
+            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
+            NetworkId::Bitcoin(bnet) => {
+                let address = Address::p2wpkh(&child_xpub.public_key, bnet);
 
-            // Tell the node to watch the new address.
-            // Since this is a newly generated address, rescanning is not required.
-            let meta = AddressMeta {
-                fp: Some(xpriv.fingerprint(&SECP)),
-                child: Some(child),
-                ..Default::default()
-            };
-            self.rpc.import_public_key(
-                &child_xpub.public_key,
-                Some(&meta.to_label()?),
-                Some(false),
-            )?;
-            address.to_string()
+                // Tell the node to watch the new address.
+                // Since this is a newly generated address, rescanning is not required.
+                let meta = AddressMeta {
+                    fp: Some(xpriv.fingerprint(&SECP)),
+                    child: Some(child.get()),
+                    ..Default::default()
+                };
+                self.rpc.import_public_key(
+                    &child_xpub.public_key,
+                    Some(&meta.to_label()?),
+                    Some(false),
+                )?;
+                address.to_string()
+            }
         };
 
-        Ok(address_str)
-    }
-
-    /// Increment the bip32 child cell by one.
-    fn increment_child_cell(child_cell: &cell::Cell<bip32::ChildNumber>) -> Result<(), Error> {
-        child_cell.set(match child_cell.get() {
+        child.set(match child.get() {
             bip32::ChildNumber::Normal { index } => bip32::ChildNumber::from_normal_idx(index + 1)?,
             _ => unreachable!(),
         });
-        Ok(())
+
+        Ok(address_str)
     }
 
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
@@ -480,9 +466,8 @@ impl Wallet {
 
         let address = self.next_address(
             self.external_xpriv.as_ref().unwrap(),
-            self.next_external_child.get(),
+            &self.next_external_child,
         )?;
-        Self::increment_child_cell(&self.next_external_child)?;
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
         //    "address_type": "p2wsh",
