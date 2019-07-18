@@ -143,7 +143,10 @@ impl Network {
             rpc_url = rpc_url.join(&format!("/wallet/{}", wallet))?;
         }
 
-        Ok(Client::new(rpc_url.to_string(), Auth::UserPass(rpc_user, rpc_pass))?)
+        Ok(Client::new(
+            rpc_url.to_string(),
+            Auth::UserPass(rpc_user, rpc_pass),
+        )?)
     }
 }
 

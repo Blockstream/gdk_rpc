@@ -265,7 +265,10 @@ fn send_coins(address: &bitcoin::Address, amount: f64) -> sha256d::Hash {
     let txid = BITCOIND
         .send_to_address(address, amount, None, None, None, None, None, None)
         .unwrap();
-    info!("send_coins(): Send {} BTC to {} in txid {}", amount, address, txid);
+    info!(
+        "send_coins(): Send {} BTC to {} in txid {}",
+        amount, address, txid
+    );
     txid
 }
 
