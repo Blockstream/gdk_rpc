@@ -18,7 +18,10 @@ const CORE_INSUFFICIENT_FUNDS: i32 = -1;
 #[derive(Debug)]
 pub enum Error {
     // First we specify exact errors that map GDK errors.
+    /// There were insufficient funds.
     InsufficientFunds,
+    /// User tried logging into a wallet that was not registered yet.
+    WalletNotRegistered,
 
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),

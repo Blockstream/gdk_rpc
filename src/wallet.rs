@@ -116,8 +116,7 @@ impl Wallet {
     ) -> Result<PersistentWalletState, Error> {
         let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
-            //TODO(stevenroose) use a custom error struct
-            None => bail!("wallet not initialized!"),
+            None => return Err(Error::WalletNotRegistered),
             Some(Value::String(label)) => Ok(
                 match serde_json::from_str::<PersistentWalletState>(&label) {
                     Err(_) => panic!(
@@ -165,17 +164,16 @@ impl Wallet {
 
     /// Register a new [Wallet].
     pub fn register(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
         let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
         let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
         // create the wallet in Core
         let tmp_rpc = network.connect(None)?;
         if let Some(warning) = tmp_rpc.create_wallet(fp.as_str(), Some(true))?.warning {
-            bail!(
+            warn!(
                 "Received warning when creating wallet {} in Core: {}",
-                fp,
-                warning,
+                fp, warning,
             );
         }
 
@@ -198,7 +196,7 @@ impl Wallet {
 
     /// Login to an existing [Wallet].
     pub fn login(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English)?;
+        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
         let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
         let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
