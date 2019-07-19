@@ -88,7 +88,7 @@ impl Wallet {
         let child_xpriv = master_xpriv.derive_priv(&SECP, &[child]).unwrap();
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
         match network {
-            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
+            NetworkId::Elements(..) => unimplemented!(), //TODO(stevenroose) implement
             NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
         }
     }
@@ -523,7 +523,7 @@ impl Wallet {
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
 
         let address_str = match self.network.id() {
-            NetworkId::Liquid => unimplemented!(), //TODO(stevenroose) implement
+            NetworkId::Elements(..) => unimplemented!(), //TODO(stevenroose) implement
             NetworkId::Bitcoin(bnet) => {
                 let address = Address::p2wpkh(&child_xpub.public_key, bnet);
 

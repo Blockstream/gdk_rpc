@@ -116,8 +116,14 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NetworkId {
+pub enum ElementsNetwork {
     Liquid,
+    ElementsRegtest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkId {
+    Elements(ElementsNetwork),
     Bitcoin(bitcoin::Network),
 }
 
@@ -156,7 +162,8 @@ impl Network {
 
     pub fn id(&self) -> NetworkId {
         match (self.liquid, self.mainnet, self.development) {
-            (true, _, _) => NetworkId::Liquid,
+            (true, true, false) => NetworkId::Elements(ElementsNetwork::Liquid),
+            (true, false, true) => NetworkId::Elements(ElementsNetwork::ElementsRegtest),
             (_, true, false) => NetworkId::Bitcoin(bitcoin::Network::Bitcoin),
             (_, false, true) => NetworkId::Bitcoin(bitcoin::Network::Regtest),
             (l, m, d) => panic!(
