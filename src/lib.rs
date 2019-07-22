@@ -27,6 +27,7 @@ extern crate android_log;
 extern crate stderrlog;
 extern crate url;
 
+pub mod coins;
 pub mod constants;
 #[macro_use]
 pub mod errors;
@@ -397,7 +398,17 @@ pub extern "C" fn GA_create_transaction(
         Err(err) => {
             // errors are returned as a GA_OK with "error" in the returned object
             debug!("GA_create_transaction error: {:?}", err);
-            return ok_json!(ret, extend(res, json!({ "error": err.to_gdk_code() })).unwrap());
+            return ok_json!(
+                ret,
+                extend(
+                    res,
+                    json!({
+                        "error": err.to_gdk_code(),
+                        "error_msg": err.to_string(),
+                    })
+                )
+                .unwrap()
+            );
         }
         Ok(x) => x,
     };

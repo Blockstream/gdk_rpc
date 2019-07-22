@@ -451,9 +451,14 @@ fn send_tx() {
         // cSNEZVDaawKzkZcmby8GrTwroE5EoNkSeH6XMxZfauzrpWJDkQ6p -> mnQUxaPB6hXKV8aGvShvuUDuXbPzhfVCy1
         json!({ "addressees": [ {"address":"mt9XjRweetsyCtc6HaXRohJSzvV9v796Ym", "satoshi": 569000}, {"address":"bitcoin:mnQUxaPB6hXKV8aGvShvuUDuXbPzhfVCy1", "satoshi":1000} ] }),
     );
-    let mut tx_detail_unsigned: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_create_transaction(sess, details, &mut tx_detail_unsigned) });
-    info!("create_transaction: {:#?}\n", read_json(tx_detail_unsigned));
+    let mut tx_detail_unsigned_ptr: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe {
+        GA_create_transaction(sess, details, &mut tx_detail_unsigned_ptr)
+    });
+    let tx_detail_unsigned = read_json(tx_detail_unsigned_ptr);
+    info!("create_transaction: {:#?}\n", tx_detail_unsigned);
+    let err = tx_detail_unsigned["error"].as_str().unwrap();
+    assert!(err.is_empty(), "create_transaction error: {}", err);
 
     // check balance
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
@@ -463,7 +468,9 @@ fn send_tx() {
     assert_eq!("500", balance);
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_sign_transaction(sess, tx_detail_unsigned, &mut auth_handler) });
+    assert_eq!(GA_OK, unsafe {
+        GA_sign_transaction(sess, tx_detail_unsigned_ptr, &mut auth_handler)
+    });
     let sign_status = get_status(auth_handler);
     info!("sign_transaction status: {:#?}\n", sign_status);
 
