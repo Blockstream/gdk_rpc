@@ -28,13 +28,32 @@ const PER_PAGE: usize = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 
 /// Meta-information about an address that we need to store.
-/// We use this to store multiple fields inside the address label field.
+///
+/// Since we don't have a persistent database, we use the Core wallet to store
+/// the information required for operating GDK.  For addresses, it's important
+/// to keep the information needed to re-derive the private key: an identifier
+/// of the master private key (i.e. the fingerprint) and the derivation path.
+///
+/// GDK also allows storing memos on transaction. Because Core doesn't support
+/// transaction labels but only address labels, we inject the tx memos inside
+/// the address label of an (preferably the first) address used in that
+/// transaction.
+///
+/// This struct is used to structure the data stored in a label. It is
+/// serialized as JSON when stored in a label, so that new fields can easily
+/// be added.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 struct AddressMeta {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fp: Option<bip32::Fingerprint>,
+    /// The fingerprint of the extended private key used to derive the
+    /// private key for this address.
+    #[serde(rename = "fp", skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<bip32::Fingerprint>,
+    /// The derivation path from the extended private key identified
+    /// by the fingerprint field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub child: Option<bip32::ChildNumber>,
+    /// Since an address can be used in multiple transactions, we keep a map
+    /// from the txid to the memo for the transaction.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub txmemo: HashMap<sha256d::Hash, String>,
 }
@@ -48,6 +67,7 @@ impl AddressMeta {
             None => Ok(Default::default()),
         }
     }
+
     /// Serialize to string to save into a label.
     pub fn to_label(&self) -> Result<String, Error> {
         Ok(serde_json::to_string(self)?)
@@ -451,13 +471,13 @@ impl Wallet {
             let sighash_components = bip143::SighashComponents::new(&unsigned_tx);
             for (idx, details) in input_details.into_iter().enumerate() {
                 let label = AddressMeta::from_label(details.label.as_ref())?;
-                if label.fp.is_none() || label.child.is_none() {
+                if label.fingerprint.is_none() || label.child.is_none() {
                     error!(
                         "An address that is not ours is used for coin selection: {}",
                         details.address
                     );
                 }
-                let fp = label.fp.unwrap();
+                let fp = label.fingerprint.unwrap();
                 let xpriv = if fp == self.external_xpriv.fingerprint(&SECP) {
                     self.external_xpriv
                 } else if fp == self.internal_xpriv.fingerprint(&SECP) {
@@ -465,7 +485,7 @@ impl Wallet {
                 } else {
                     throw!(
                         "address is labeled with unknown master xpriv fingerprint: {:?}",
-                        label.fp
+                        label.fingerprint
                     )
                 };
                 let privkey = xpriv
@@ -530,10 +550,11 @@ impl Wallet {
                 // Tell the node to watch the new address.
                 // Since this is a newly generated address, rescanning is not required.
                 let meta = AddressMeta {
-                    fp: Some(xpriv.fingerprint(&SECP)),
+                    fingerprint: Some(xpriv.fingerprint(&SECP)),
                     child: Some(child.get()),
                     ..Default::default()
                 };
+                // Full usafe of address labels explained on [AddressMeta].
                 self.rpc.import_public_key(
                     &child_xpub.public_key,
                     Some(&meta.to_label()?),
@@ -636,10 +657,11 @@ impl Wallet {
             throw!("Tx info for {} does not contain any details", txid);
         }
 
-        // We just need any usable address label. Let's just take the first and hope Core always
-        // orders them in the same way, so we can also efficiently find it back later.
-        // We explicitly tag this label with the txid of this tx, so that if an address gets
-        // assigned multiple transaction memos, they won't conflict.
+        // We just need any usable address label. Let's just take the first
+        // and hope Core always orders them in the same way, so we can also
+        // efficiently find it back later. We explicitly tag this label with
+        // the txid of this tx, so that if an address gets assigned multiple
+        // transaction memos, they won't conflict.
         let detail = &txdesc.details[0];
         let mut label = AddressMeta::from_label(detail.label.as_ref())?;
         label.txmemo.insert(txid, memo.to_owned());
