@@ -25,6 +25,7 @@ use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::{Error, OptionExt};
 use crate::network::{Network, NetworkId};
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, SECP};
+
 #[cfg(feature = "liquid")]
 use crate::wally;
 

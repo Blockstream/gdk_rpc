@@ -5,8 +5,6 @@ extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
 extern crate chrono;
 extern crate dirs;
-#[cfg(feature = "liquid")]
-extern crate elements;
 extern crate jsonrpc;
 extern crate libc;
 extern crate rand;
@@ -27,6 +25,12 @@ extern crate android_log;
 extern crate stderrlog;
 extern crate url;
 
+// Liquid
+#[cfg(feature = "liquid")]
+extern crate elements;
+#[cfg(feature = "liquid")]
+extern crate liquid_rpc;
+
 pub mod coins;
 pub mod constants;
 #[macro_use]
@@ -36,6 +40,8 @@ pub mod session;
 pub mod settings;
 pub mod util;
 pub mod wallet;
+
+// Liquid
 #[cfg(feature = "liquid")]
 pub mod wally;
 

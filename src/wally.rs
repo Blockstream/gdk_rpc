@@ -374,6 +374,35 @@ mod ffi {
             bytes_out: *mut c_uchar,
             len: usize,
         ) -> c_int;
+
+        //WALLY_CORE_API int wally_asset_blinding_key_from_seed(
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    unsigned char *bytes_out,
+        //    size_t len);
+        pub fn wally_asset_blinding_key_from_seed(
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            bytes_out: *mut c_uchar,
+            len: size_t,
+        ) -> c_int;
+
+        //WALLY_CORE_API int wally_asset_blinding_key_to_ec_private_key(
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    const unsigned char *script,
+        //    size_t script_len,
+        //    unsigned char *bytes_out,
+        //    size_t len);
+        //    }
+        pub fn wally_asset_blinding_key_to_ec_private_key(
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            script: *const c_uchar,
+            script_len: size_t,
+            bytes_out: *mut c_uchar,
+            len: size_t,
+        ) -> c_int;
     }
 }
 
@@ -480,6 +509,41 @@ pub fn tx_get_elements_signature_hash(
     //TODO(stevenroose) use from_inner with hashes 0.7
     sha256d::Hash::from_slice(&out[..]).unwrap()
 }
+
+pub fn asset_blinding_key_from_seed(seed: &[u8]) -> [u8; 64] {
+    assert_eq!(seed.len(), 64);
+    let mut out = [0; 64];
+    let ret = unsafe {
+        ffi::wally_asset_blinding_key_from_seed(
+            seed.as_ptr(),
+            seed.len(),
+            out.as_mut_ptr(),
+            out.len(),
+        )
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+    out
+}
+
+pub fn asset_blinding_key_to_ec_private_key(
+    master_blinding_key: &[u8; 64],
+    script_pubkey: &bitcoin::Script,
+) -> secp256k1::SecretKey {
+    let mut out = [0; 32];
+    let ret = unsafe {
+        ffi::wally_asset_blinding_key_to_ec_private_key(
+            master_blinding_key.as_ptr(),
+            master_blinding_key.len(),
+            script_pubkey.as_bytes().as_ptr(),
+            script_pubkey.as_bytes().len(),
+            out.as_mut_ptr(),
+            out.len(),
+        )
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+    secp256k1::SecretKey::from_slice(&out).expect("size is 32")
+}
+
 
 #[cfg(test)]
 mod tests {
