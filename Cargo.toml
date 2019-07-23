@@ -15,8 +15,7 @@ stderr_logger = ["stderrlog"]
 
 [dependencies]
 bitcoin = "0.18"
-#bitcoincore-rpc = "0.6.0"
-bitcoincore-rpc = { git = "git://github.com/stevenroose/rust-bitcoincore-rpc.git", branch = "devel" }
+bitcoincore-rpc = "0.7.0"
 bitcoin_hashes = { version = "0.3", features = [ "serde" ] }
 secp256k1 = { version = "0.12", features = [ "rand" ] }
 bip39 = "0.6.0-beta"
