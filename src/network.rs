@@ -140,11 +140,7 @@ impl Network {
         let cred = self
             .rpc_cred
             .clone()
-            .or_else(|| {
-                self.rpc_cookie
-                    .as_ref()
-                    .and_then(|path| read_cookie(path).ok())
-            })
+            .or_else(|| self.rpc_cookie.as_ref().and_then(|path| read_cookie(path).ok()))
             .or_err("missing rpc credentials")?;
 
         let (rpc_user, rpc_pass) = cred;
@@ -154,10 +150,7 @@ impl Network {
             rpc_url = rpc_url.join(&format!("/wallet/{}", wallet))?;
         }
 
-        Ok(Client::new(
-            rpc_url.to_string(),
-            Auth::UserPass(rpc_user, rpc_pass),
-        )?)
+        Ok(Client::new(rpc_url.to_string(), Auth::UserPass(rpc_user, rpc_pass))?)
     }
 
     pub fn id(&self) -> NetworkId {
@@ -166,10 +159,7 @@ impl Network {
             (true, false, true) => NetworkId::Elements(ElementsNetwork::ElementsRegtest),
             (_, true, false) => NetworkId::Bitcoin(bitcoin::Network::Bitcoin),
             (_, false, true) => NetworkId::Bitcoin(bitcoin::Network::Regtest),
-            (l, m, d) => panic!(
-                "inconsistent network parameters: lq={}, main={}, dev={}",
-                l, m, d
-            ),
+            (l, m, d) => panic!("inconsistent network parameters: lq={}, main={}, dev={}", l, m, d),
         }
     }
 }

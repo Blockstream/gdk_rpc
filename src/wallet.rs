@@ -122,10 +122,7 @@ impl Wallet {
 
         let store_addr = Wallet::persistent_state_address(self.network.id(), &self.master_xpriv);
         // Generic call for liquid compat.
-        self.rpc.call(
-            "setlabel",
-            &[store_addr.into(), serde_json::to_string(&state)?.into()],
-        )?;
+        self.rpc.call("setlabel", &[store_addr.into(), serde_json::to_string(&state)?.into()])?;
         Ok(())
     }
 
@@ -137,15 +134,15 @@ impl Wallet {
         let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
             None => return Err(Error::WalletNotRegistered),
-            Some(Value::String(label)) => Ok(
-                match serde_json::from_str::<PersistentWalletState>(&label) {
+            Some(Value::String(label)) => {
+                Ok(match serde_json::from_str::<PersistentWalletState>(&label) {
                     Err(_) => panic!(
                         "corrupt persistent wallet state label (address: {}): {}",
                         state_addr, label
                     ),
                     Ok(s) => s,
-                },
-            ),
+                })
+            }
             Some(_) => unreachable!(),
         }
     }
@@ -157,27 +154,17 @@ impl Wallet {
     /// - the internal address xpriv
     fn calc_seeds(
         mnemonic: &Mnemonic,
-    ) -> (
-        bip32::ExtendedPrivKey,
-        bip32::ExtendedPrivKey,
-        bip32::ExtendedPrivKey,
-    ) {
+    ) -> (bip32::ExtendedPrivKey, bip32::ExtendedPrivKey, bip32::ExtendedPrivKey) {
         let seed = Seed::new(&mnemonic, "");
         // Network isn't of importance here.
         let master_xpriv =
             bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes()).unwrap();
         // Add BIP-44 derivations for external and internal addresses.
         let external_xpriv = master_xpriv
-            .derive_priv(
-                &SECP,
-                &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap(),
-            )
+            .derive_priv(&SECP, &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap())
             .unwrap();
         let internal_xpriv = master_xpriv
-            .derive_priv(
-                &SECP,
-                &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/1").unwrap(),
-            )
+            .derive_priv(&SECP, &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/1").unwrap())
             .unwrap();
         (master_xpriv, external_xpriv, internal_xpriv)
     }
@@ -193,10 +180,9 @@ impl Wallet {
         match tmp_rpc.create_wallet(fp.as_str(), Some(true))?.warning {
             None => {}
             Some(ref s) if s.is_empty() => {}
-            Some(warning) => warn!(
-                "Received warning when creating wallet {} in Core: {}",
-                fp, warning,
-            ),
+            Some(warning) => {
+                warn!("Received warning when creating wallet {} in Core: {}", fp, warning,)
+            }
         }
         let rpc = network.connect(Some(fp))?;
 
@@ -325,9 +311,8 @@ impl Wallet {
 
     fn _get_balance(&self, min_conf: u32) -> Result<Value, Error> {
         //TODO(stevenroose) implement in rust-bitcoincore-rpc once bitcoin::Amount lands
-        let balance: f64 = self
-            .rpc
-            .call("getbalance", &[Value::Null, json!(min_conf), json!(true)])?;
+        let balance: f64 =
+            self.rpc.call("getbalance", &[Value::Null, json!(min_conf), json!(true)])?;
 
         Ok(self._convert_satoshi(btc_to_usat(balance)))
     }
@@ -345,9 +330,7 @@ impl Wallet {
 
     fn _get_transactions(&self, limit: usize, start: usize) -> Result<(Vec<Value>, bool), Error> {
         // fetch listtranssactions
-        let txdescs = self
-            .rpc
-            .list_transactions(None, Some(limit), Some(start), Some(true))?;
+        let txdescs = self.rpc.list_transactions(None, Some(limit), Some(start), Some(true))?;
         let potentially_has_more = txdescs.len() == limit;
 
         // fetch full transactions and convert to GDK format
@@ -380,10 +363,7 @@ impl Wallet {
             desc.amount.into_inner(),
             desc.fee.unwrap().into_inner(),
             &desc.info,
-            &desc
-                .details
-                .iter()
-                .collect::<Vec<&rpcjson::GetTransactionResultDetail>>(),
+            &desc.details.iter().collect::<Vec<&rpcjson::GetTransactionResultDetail>>(),
         )
     }
 
@@ -393,9 +373,7 @@ impl Wallet {
         let outs = parse_outs(&details)?;
         debug!("create_transaction() addresses: {:?}", outs);
 
-        let unfunded_tx = self
-            .rpc
-            .create_raw_transaction_hex(&[], &outs, None, None)?;
+        let unfunded_tx = self.rpc.create_raw_transaction_hex(&[], &outs, None, None)?;
 
         debug!("create_transaction unfunded tx: {:?}", unfunded_tx);
 
@@ -411,10 +389,7 @@ impl Wallet {
         let change_address = self.next_address(&self.internal_xpriv, &self.next_internal_child)?;
 
         // check listunspent
-        debug!(
-            "list_unspent: {:?}",
-            self.rpc.list_unspent(Some(0), None, None, None, None)?
-        );
+        debug!("list_unspent: {:?}", self.rpc.list_unspent(Some(0), None, None, None, None)?);
 
         //TODO(stevenroose) liquid
         let fund_opts = bitcoincore_rpc::json::FundRawTransactionOptions {
@@ -488,9 +463,7 @@ impl Wallet {
                         label.fingerprint
                     )
                 };
-                let privkey = xpriv
-                    .derive_priv(&SECP, &[label.child.unwrap()])?
-                    .private_key;
+                let privkey = xpriv.derive_priv(&SECP, &[label.child.unwrap()])?.private_key;
                 let pubkey = privkey.public_key(&SECP);
 
                 let script_code = bitcoin::Address::p2pkh(&pubkey, privkey.network).script_pubkey();
@@ -506,12 +479,7 @@ impl Wallet {
             }
 
             //TODO(stevenroose) remove when confident in signing code
-            let accept = self
-                .rpc
-                .test_mempool_accept(&[&unsigned_tx])?
-                .into_iter()
-                .next()
-                .unwrap();
+            let accept = self.rpc.test_mempool_accept(&[&unsigned_tx])?.into_iter().next().unwrap();
             if accept.allowed == false {
                 error!(
                     "sign_transaction(): signed tx is not valid: {}",
@@ -565,7 +533,9 @@ impl Wallet {
         };
 
         child.set(match child.get() {
-            bip32::ChildNumber::Normal { index } => bip32::ChildNumber::from_normal_idx(index + 1)?,
+            bip32::ChildNumber::Normal {
+                index,
+            } => bip32::ChildNumber::from_normal_idx(index + 1)?,
             _ => unreachable!(),
         });
 
@@ -605,9 +575,7 @@ impl Wallet {
     }
     pub fn _make_fee_estimates(&self) -> Result<Value, Error> {
         let mempoolinfo: Value = self.rpc.call("getmempoolinfo", &[])?;
-        let minrelayfee = json!(btc_to_usat(
-            mempoolinfo["minrelaytxfee"].as_f64().req()? / 1000.0
-        ));
+        let minrelayfee = json!(btc_to_usat(mempoolinfo["minrelaytxfee"].as_f64().req()? / 1000.0));
 
         let mut estimates: Vec<Value> = (2u16..25u16)
             .into_iter()
@@ -666,10 +634,7 @@ impl Wallet {
         let mut label = AddressMeta::from_label(detail.label.as_ref())?;
         label.txmemo.insert(txid, memo.to_owned());
 
-        debug!(
-            "set_tx_memo() for {}, memo={}, address={}",
-            txid, memo, detail.address
-        );
+        debug!("set_tx_memo() for {}, memo={}, address={}", txid, memo, detail.address);
 
         self.rpc.set_label(&detail.address, &label.to_label()?)?;
         Ok(())
@@ -735,7 +700,11 @@ fn format_gdk_tx(
     let weight = tx.get_weight();
     let vsize = (weight as f32 / 4.0) as u32;
 
-    let type_str = if amount > 0 { "incoming" } else { "outgoing" };
+    let type_str = if amount > 0 {
+        "incoming"
+    } else {
+        "outgoing"
+    };
 
     //// read out from the "label" field if available,
     //// or fallback to concating the labels for all the "details" items together

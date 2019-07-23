@@ -18,10 +18,7 @@ pub struct GA_session {
     pub settings: Settings,
     pub network: Option<&'static Network>,
     pub wallet: Option<Wallet>,
-    pub notify: Option<(
-        extern "C" fn(*const libc::c_void, *const GA_json),
-        *const libc::c_void,
-    )>,
+    pub notify: Option<(extern "C" fn(*const libc::c_void, *const GA_json), *const libc::c_void)>,
 }
 
 impl GA_session {

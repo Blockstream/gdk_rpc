@@ -395,20 +395,14 @@ pub extern "C" fn GA_create_transaction(
         Err(err) => {
             // errors are returned as a GA_OK with "error" in the returned object
             debug!("GA_create_transaction error: {:?}", err);
-            return ok_json!(
-                ret,
-                extend(res, json!({ "error": err.to_gdk_code() })).unwrap()
-            );
+            return ok_json!(ret, extend(res, json!({ "error": err.to_gdk_code() })).unwrap());
         }
         Ok(x) => x,
     };
 
     debug!("GA_create_transaction() tx_unsigned {}", tx_unsigned);
 
-    ok_json!(
-        ret,
-        extend(res, json!({ "error": "", "hex": tx_unsigned })).unwrap()
-    )
+    ok_json!(ret, extend(res, json!({ "error": "", "hex": tx_unsigned })).unwrap())
 }
 
 #[no_mangle]
@@ -428,10 +422,7 @@ pub extern "C" fn GA_sign_transaction(
 
     debug!("GA_sign_transaction() {:?}", tx_signed);
 
-    ok!(
-        ret,
-        GA_auth_handler::done(json!({ "error": "", "hex": tx_signed, "is_sweep": false }))
-    )
+    ok!(ret, GA_auth_handler::done(json!({ "error": "", "hex": tx_signed, "is_sweep": false })))
 }
 
 #[no_mangle]
@@ -447,10 +438,7 @@ pub extern "C" fn GA_send_transaction(
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let txid = tryit!(wallet.send_transaction(&tx_detail_signed));
 
-    ok!(
-        ret,
-        GA_auth_handler::done(json!({ "error": "", "txid": txid }))
-    )
+    ok!(ret, GA_auth_handler::done(json!({ "error": "", "txid": txid })))
 }
 
 #[no_mangle]
@@ -623,9 +611,7 @@ pub extern "C" fn GA_get_fee_estimates(sess: *const GA_session, ret: *mut *const
     let sess = sm.get(sess).unwrap();
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let estimates = tryit!(wallet
-        .get_fee_estimates()
-        .or_err("fee estimates unavailable"));
+    let estimates = tryit!(wallet.get_fee_estimates().or_err("fee estimates unavailable"));
 
     ok_json!(ret, json!({ "fees": estimates }))
 }
