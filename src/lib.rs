@@ -163,6 +163,16 @@ pub extern "C" fn GA_get_networks(ret: *mut *const GA_json) -> i32 {
 static INIT_LOGGER: Once = ONCE_INIT;
 
 #[no_mangle]
+pub extern "C" fn GA_init(config: *const GA_json) -> i32 {
+    debug!("GA_init() config: {:?}", config);
+
+    #[cfg(feature = "android_logger")]
+    INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
+
+    GA_OK
+}
+
+#[no_mangle]
 pub extern "C" fn GA_create_session(ret: *mut *const GA_session) -> i32 {
     debug!("GA_create_session()");
 
