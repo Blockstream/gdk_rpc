@@ -246,7 +246,8 @@ fn tick(sess: *mut GA_session) {
 }
 
 fn mine_blocks(n: u64) -> Vec<sha256d::Hash> {
-    BITCOIND.generate(n, None).unwrap()
+    let address = BITCOIND.get_new_address(None, None).unwrap();
+    BITCOIND.generate_to_address(n, &address).unwrap()
 }
 
 fn send_coins(address: &bitcoin::Address, amount: f64) -> sha256d::Hash {
