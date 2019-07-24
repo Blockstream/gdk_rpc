@@ -2,6 +2,7 @@ use core::fmt;
 use std::borrow::Cow;
 use std::io;
 
+use backtrace::Backtrace;
 use bitcoin::consensus::encode;
 use bitcoin::util::bip32;
 use bitcoincore_rpc;
@@ -78,6 +79,7 @@ impl fmt::Display for Error {
 
 impl From<bitcoincore_rpc::Error> for Error {
     fn from(e: bitcoincore_rpc::Error) -> Error {
+        debug!("backtrace bitcoincore_rpc::Error: {} {:?}", e, Backtrace::new());
         match e {
             bitcoincore_rpc::Error::JsonRpc(ref e) => match e {
                 jsonrpc::Error::Rpc(ref e) => match e.code {
@@ -102,6 +104,7 @@ macro_rules! from_error {
     ($variant:ident, $err:ty) => {
         impl From<$err> for Error {
             fn from(e: $err) -> Error {
+                debug!("backtrace {}: {} {:?}", stringify!($err), e, Backtrace::new());
                 Error::$variant(e)
             }
         }
@@ -135,10 +138,16 @@ pub trait OptionExt<T> {
 
 impl<T> OptionExt<T> for Option<T> {
     fn or_err<E: Into<Cow<'static, str>>>(self, err: E) -> Result<T, Error> {
-        self.ok_or_else(|| Error::Other(err.into()))
+        self.ok_or_else(|| {
+            debug!("backtrace OptionExt::or_else: {:?}", Backtrace::new());
+            Error::Other(err.into())
+        })
     }
 
     fn req(self) -> Result<T, Error> {
-        self.ok_or_else(|| Error::Other("missing required option".into()))
+        self.ok_or_else(|| {
+            debug!("backtrace OptionExt::req: {:?}", Backtrace::new());
+            Error::Other("missing required option".into())
+        })
     }
 }
