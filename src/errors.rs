@@ -6,6 +6,8 @@ use backtrace::Backtrace;
 use bitcoin::consensus::encode;
 use bitcoin::util::bip32;
 use bitcoincore_rpc;
+#[cfg(feature = "liquid")]
+use elements;
 use failure;
 use hex;
 use secp256k1;
@@ -38,11 +40,16 @@ pub enum Error {
     /// probably have to be reset.
     CorruptNodeData,
 
+    /// The Elements node returned errors when asked to sign a transaction.
+    ElementsCantSign(Vec<bitcoincore_rpc::json::SignRawTransactionResultError>),
+
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),
     Bip39(failure::Error),
     BitcoinEncode(encode::Error),
     BitcoinRpc(bitcoincore_rpc::Error),
+    #[cfg(feature = "liquid")]
+    ElementsAddress(elements::AddressError),
     Hashes(bitcoin_hashes::Error),
     Hex(hex::FromHexError),
     Io(io::Error),
@@ -113,6 +120,8 @@ macro_rules! from_error {
 
 from_error!(Bip32, bip32::Error);
 from_error!(BitcoinEncode, encode::Error);
+#[cfg(feature = "liquid")]
+from_error!(ElementsAddress, elements::AddressError);
 from_error!(Hashes, bitcoin_hashes::Error);
 from_error!(Hex, hex::FromHexError);
 from_error!(Io, io::Error);

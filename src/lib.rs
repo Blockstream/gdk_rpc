@@ -1,5 +1,6 @@
 #![recursion_limit = "128"]
 
+extern crate backtrace;
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
@@ -28,6 +29,8 @@ extern crate url;
 // Liquid
 #[cfg(feature = "liquid")]
 extern crate elements;
+#[cfg(feature = "liquid")]
+extern crate liquid_rpc;
 #[cfg(feature = "liquid")]
 extern crate slip21;
 
@@ -249,7 +252,6 @@ pub extern "C" fn GA_register_user(
     mnemonic: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    println!("GA_register_user1()");
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);

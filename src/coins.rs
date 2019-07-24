@@ -20,6 +20,7 @@ pub mod liq {
 
     use super::no_support;
     use crate::errors::Error;
+    use crate::network::ElementsNetwork;
 
     pub fn tx_props(raw_tx: &[u8]) -> Result<Value, Error> {
         no_support("liquid")
@@ -29,7 +30,13 @@ pub mod liq {
         no_support("liquid")
     }
 
-    pub fn sign_transaction<G>(_: &RpcClient, _: &Value, _: &str, _: G) -> Result<Vec<u8>, Error>
+    pub fn sign_transaction<G>(
+        _: &RpcClient,
+        _: ElementsNetwork,
+        _: &Value,
+        _: &str,
+        _: G,
+    ) -> Result<Vec<u8>, Error>
     where
         G: Fn(&bip32::Fingerprint, &bip32::ChildNumber) -> Result<secp256k1::SecretKey, Error>,
     {
