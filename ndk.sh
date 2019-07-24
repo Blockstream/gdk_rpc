@@ -2,10 +2,14 @@
 set -eo pipefail
 if [ -f /.dockerenv ]; then
     source /root/.cargo/env
-    export ANDROID_NDK=/android-ndk-r19b
+    export ANDROID_NDK=/android-ndk-r20
     export GDK_LOCATION=/gdk
-    export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
+    export JAVA_HOME=/usr/lib/jvm/adoptopenjdk-8-hotspot-amd64
 fi
+have_cmd()
+{
+    command -v "$1" >/dev/null 2>&1
+}
 if [ -z "$ANDROID_NDK" ]; then
     if have_cmd ndk-build; then
         export ANDROID_NDK=$(dirname $(command -v ndk-build))
