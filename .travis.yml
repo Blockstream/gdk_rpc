@@ -12,20 +12,31 @@ env:
 
 matrix:
   include:
-    # fmt checks and release build
-    - script:
+    - name: fmt checks and release build
+      script:
         - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && export GDK_TARGET=build-clang && source /root/.cargo/env && cargo fmt --all -- --check && ./build_deps.sh && cargo check --all && cargo clippy --all && cargo build --all --release"
 
-    # unit tests
-    - script:
+    - name: unit tests bitcoin
+      script:
         - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && export GDK_TARGET=build-clang && ./build_deps.sh && ./test.sh"
-    # NDK check
-    - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh armeabi-v7a"
-    - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh arm64-v8a"
-    - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86_64"
-    - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86"
 
+    - name: unit tests elements
+      env:
+        - TEST_MODE=elementsregtest
+        - EXEC_NODE=liquidd
+        - EXEC_CLI=liquid-cli
+      script:
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && export GDK_TARGET=build-clang && ./build_deps.sh && ./test.sh"
+
+    - name: ndk armeabi-v7a
+      script:
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh armeabi-v7a"
+    - name: ndk arm64-v8a
+      script:
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh arm64-v8a"
+    - name: ndk x86_64
+      script:
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86_64"
+    - name: ndk x86
+      script:
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86"
