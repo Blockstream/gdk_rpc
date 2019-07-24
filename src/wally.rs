@@ -11,12 +11,6 @@ use crate::errors::Error;
 use crate::util::{make_str, read_str};
 
 mod ffi {
-    use std::ops::Drop;
-    use std::{mem, ptr, slice};
-
-    use bitcoin::consensus::encode::serialize;
-    use bitcoin_hashes::Hash;
-    use elements;
     use libc::{c_char, c_int, c_uchar, c_void};
 
     #[allow(non_camel_case_types)]
@@ -30,284 +24,15 @@ mod ffi {
     #[allow(unused)]
     pub const WALLY_ENOMEM: c_int = -3;
 
-    /// Allocate a vector on the heap and return a raw pointer to the buffer.
-    fn vec_alloc<'a, T>(v: Vec<T>) -> *const T
-    where
-        T: 'static,
-    {
-        let boxed = v.into_boxed_slice();
-        let sliced: &'static mut [T] = Box::leak(boxed);
-        sliced.as_ptr()
-    }
+    /// Encode witness data if present.
+    pub const WALLY_TX_FLAG_USE_WITNESS: u32 = 0x1;
+    /// Encode/Decode as an elements transaction.
+    #[allow(unused)]
+    pub const WALLY_TX_FLAG_USE_ELEMENTS: u32 = 0x2;
 
-    /// Convert a slice into a slice of another type and return a raw pointer
-    /// to the heap-allocated buffer.
-    fn slice_convert_alloc<'a, F, T>(f: &'a [F]) -> *const T
-    where
-        T: 'static + From<&'a F>,
-    {
-        vec_alloc(f.iter().map(From::from).collect())
-    }
-
-    /// Drop the struct inside the given pointer, setting it to null.
-    unsafe fn struct_drop<T>(pointer: &mut *const T) {
-        let mut p = ptr::null();
-        mem::swap(&mut p, pointer);
-        let _ = Box::from_raw(p as *mut T);
-    }
-
-    /// Drop the slice inside the given pointer, setting it to null.
-    unsafe fn slice_drop<T>(pointer: &mut *const T, len: usize) {
-        let mut p = ptr::null();
-        mem::swap(&mut p, pointer);
-        let slice: &[T] = slice::from_raw_parts(p, len);
-        let _ = Box::from_raw(slice as *const [T] as *mut [T]);
-    }
-
-    //struct wally_tx_witness_item {
-    //    unsigned char *witness;
-    //    size_t witness_len;
-    //};
-    #[repr(C)]
-    pub struct WallyTxWitnessItem {
-        witness: *const c_uchar,
-        witness_len: size_t,
-    }
-
-    impl<'a> From<&'a Vec<u8>> for WallyTxWitnessItem {
-        fn from(i: &'a Vec<u8>) -> WallyTxWitnessItem {
-            WallyTxWitnessItem {
-                witness: i.as_ptr(),
-                witness_len: i.len(),
-            }
-        }
-    }
-
-    //struct wally_tx_witness_stack {
-    //    struct wally_tx_witness_item *items;
-    //    size_t num_items;
-    //    size_t items_allocation_len;
-    //};
-    #[repr(C)]
-    pub struct WallyTxWitnessStack {
-        items: *const WallyTxWitnessItem,
-        num_items: size_t,
-        items_allocation_len: size_t,
-    }
-
-    impl<'a> From<&'a Vec<Vec<u8>>> for WallyTxWitnessStack {
-        fn from(s: &'a Vec<Vec<u8>>) -> WallyTxWitnessStack {
-            WallyTxWitnessStack {
-                items: slice_convert_alloc(&s[..]),
-                num_items: s.len(),
-                items_allocation_len: s.len(),
-            }
-        }
-    }
-
-    impl Drop for WallyTxWitnessStack {
-        fn drop(&mut self) {
-            unsafe {
-                slice_drop(&mut self.items, self.num_items);
-            }
-        }
-    }
-
-    ///** A transaction input */
-    //struct wally_tx_input {
-    //    unsigned char txhash[WALLY_TXHASH_LEN];
-    //    uint32_t index;
-    //    uint32_t sequence;
-    //    unsigned char *script;
-    //    size_t script_len;
-    //    struct wally_tx_witness_stack *witness;
-    //    uint8_t features;
-    //#ifdef BUILD_ELEMENTS
-    //    unsigned char blinding_nonce[SHA256_LEN];
-    //    unsigned char entropy[SHA256_LEN];
-    //    unsigned char *issuance_amount;
-    //    size_t issuance_amount_len;
-    //    unsigned char *inflation_keys;
-    //    size_t inflation_keys_len;
-    //    unsigned char *issuance_amount_rangeproof;
-    //    size_t issuance_amount_rangeproof_len;
-    //    unsigned char *inflation_keys_rangeproof;
-    //    size_t inflation_keys_rangeproof_len;
-    //    struct wally_tx_witness_stack *pegin_witness;
-    //#endif /* BUILD_ELEMENTS */
-    //};
-    #[repr(C)]
-    pub struct WallyTxInput {
-        txhash: [c_uchar; 32],
-        index: u32,
-        sequence: u32,
-        script: *const c_uchar,
-        script_len: size_t,
-        witness: *const WallyTxWitnessStack,
-        features: u8,
-        blinding_nonce: [c_uchar; 32],
-        entropy: [c_uchar; 32],
-        issuance_amount: *const c_uchar,
-        issuance_amount_len: size_t,
-        inflation_keys: *const c_uchar,
-        inflation_keys_len: size_t,
-        issuance_amount_rangeproof: *const c_uchar,
-        issuance_amount_rangeproof_len: size_t,
-        inflation_keys_rangeproof: *const c_uchar,
-        inflation_keys_rangeproof_len: size_t,
-        pegin_witness: *const WallyTxWitnessStack,
-    }
-
-    impl<'a> From<&'a elements::TxIn> for WallyTxInput {
-        fn from(txin: &'a elements::TxIn) -> WallyTxInput {
-            WallyTxInput {
-                txhash: txin.previous_output.txid.into_inner(),
-                index: txin.previous_output.vout,
-                sequence: txin.sequence,
-                script: txin.script_sig.as_bytes().as_ptr(),
-                script_len: txin.script_sig.as_bytes().len(),
-                witness: Box::into_raw(Box::new((&txin.witness.script_witness).into())),
-                features: 0, //TODO(stevenroose)
-                blinding_nonce: txin.asset_issuance.asset_blinding_nonce,
-                entropy: txin.asset_issuance.asset_entropy,
-                issuance_amount: { vec_alloc(serialize(&txin.asset_issuance.amount)) },
-                issuance_amount_len: txin.asset_issuance.amount.encoded_length(),
-                inflation_keys: vec_alloc(serialize(&txin.asset_issuance.inflation_keys)),
-                inflation_keys_len: txin.asset_issuance.inflation_keys.encoded_length(),
-                issuance_amount_rangeproof: txin.witness.amount_rangeproof.as_ptr(),
-                issuance_amount_rangeproof_len: txin.witness.amount_rangeproof.len(),
-                inflation_keys_rangeproof: txin.witness.amount_rangeproof.as_ptr(),
-                inflation_keys_rangeproof_len: txin.witness.amount_rangeproof.len(),
-                pegin_witness: Box::into_raw(Box::new((&txin.witness.pegin_witness).into())),
-            }
-        }
-    }
-
-    impl Drop for WallyTxInput {
-        fn drop(&mut self) {
-            unsafe {
-                slice_drop(&mut self.issuance_amount, self.issuance_amount_len);
-                slice_drop(&mut self.inflation_keys, self.inflation_keys_len);
-                struct_drop(&mut self.witness);
-                struct_drop(&mut self.pegin_witness);
-            }
-        }
-    }
-
-    //struct wally_tx_output {
-    //    uint64_t satoshi;
-    //    unsigned char *script;
-    //    size_t script_len;
-    //    uint8_t features;
-    //#ifdef BUILD_ELEMENTS
-    //    unsigned char *asset;
-    //    size_t asset_len;
-    //    unsigned char *value;
-    //    size_t value_len;
-    //    unsigned char *nonce;
-    //    size_t nonce_len;
-    //    unsigned char *surjectionproof;
-    //    size_t surjectionproof_len;
-    //    unsigned char *rangeproof;
-    //    size_t rangeproof_len;
-    //#endif /* BUILD_ELEMENTS */
-    //};
-    #[repr(C)]
-    pub struct WallyTxOutput {
-        satoshi: u64,
-        script: *const c_uchar,
-        script_len: size_t,
-        features: u8,
-        asset: *const c_uchar,
-        asset_len: size_t,
-        value: *const c_uchar,
-        value_len: size_t,
-        nonce: *const c_uchar,
-        nonce_len: size_t,
-        surjectionproof: *const c_uchar,
-        surjectionproof_len: size_t,
-        rangeproof: *const c_uchar,
-        rangeproof_len: size_t,
-    }
-
-    impl<'a> From<&'a elements::TxOut> for WallyTxOutput {
-        fn from(txout: &'a elements::TxOut) -> WallyTxOutput {
-            WallyTxOutput {
-                satoshi: match txout.value {
-                    elements::confidential::Value::Explicit(s) => s,
-                    _ => 0,
-                },
-                script: txout.script_pubkey.as_bytes().as_ptr(),
-                script_len: txout.script_pubkey.as_bytes().len(),
-                features: 0, //TODO(stevenroose)
-                asset: vec_alloc(serialize(&txout.asset)),
-                asset_len: txout.asset.encoded_length(),
-                value: vec_alloc(serialize(&txout.value)),
-                value_len: txout.value.encoded_length(),
-                nonce: vec_alloc(serialize(&txout.nonce)),
-                nonce_len: txout.nonce.encoded_length(),
-                surjectionproof: txout.witness.surjection_proof.as_ptr(),
-                surjectionproof_len: txout.witness.surjection_proof.len(),
-                rangeproof: txout.witness.rangeproof.as_ptr(),
-                rangeproof_len: txout.witness.rangeproof.len(),
-            }
-        }
-    }
-
-    impl Drop for WallyTxOutput {
-        fn drop(&mut self) {
-            unsafe {
-                slice_drop(&mut self.asset, self.asset_len);
-                slice_drop(&mut self.value, self.value_len);
-                slice_drop(&mut self.nonce, self.nonce_len);
-            }
-        }
-    }
-
-    //struct wally_tx {
-    //    uint32_t version;
-    //    uint32_t locktime;
-    //    struct wally_tx_input *inputs;
-    //    size_t num_inputs;
-    //    size_t inputs_allocation_len;
-    //    struct wally_tx_output *outputs;
-    //    size_t num_outputs;
-    //    size_t outputs_allocation_len;
-    //};
     #[repr(C)]
     pub struct WallyTx {
-        version: u32,
-        locktime: u32,
-        inputs: *const WallyTxInput,
-        num_inputs: size_t,
-        inputs_allocation_len: size_t,
-        outputs: *const WallyTxOutput,
-        num_outputs: size_t,
-        outputs_allocation_len: size_t,
-    }
-
-    impl<'a> From<&'a elements::Transaction> for WallyTx {
-        fn from(tx: &'a elements::Transaction) -> WallyTx {
-            WallyTx {
-                version: tx.version,
-                locktime: tx.lock_time,
-                inputs: slice_convert_alloc(&tx.input[..]),
-                num_inputs: tx.input.len(),
-                inputs_allocation_len: tx.input.len(),
-                outputs: slice_convert_alloc(&tx.output[..]),
-                num_outputs: tx.output.len(),
-                outputs_allocation_len: tx.output.len(),
-            }
-        }
-    }
-
-    impl Drop for WallyTx {
-        fn drop(&mut self) {
-            unsafe {
-                slice_drop(&mut self.inputs, self.num_inputs);
-                slice_drop(&mut self.outputs, self.num_outputs);
-            }
-        }
+        _private: [u8; 0],
     }
 
     extern "C" {
@@ -356,6 +81,19 @@ mod ffi {
         //    const char *mnemonic);
         pub fn bip39_mnemonic_validate(word_list: *const c_void, mnemonic: *const c_char) -> c_int;
 
+        //WALLY_CORE_API int wally_tx_from_bytes(
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    uint32_t flags,
+        //    struct wally_tx **output);
+        pub fn wally_tx_from_bytes(
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            flags: u32,
+            output: *mut *const WallyTx,
+        ) -> c_int;
+
+        //WALLY_CORE_API int wally_tx_get_elements_signature_hash(
         //  const struct wally_tx *tx,
         //  size_t index,
         //  const unsigned char *script, size_t script_len,
@@ -480,33 +218,51 @@ pub fn bip39_mnemonic_to_seed(
     Ok(out)
 }
 
+/// Calculate the signature hash for a specific index of
+/// an Elements transaction.
 pub fn tx_get_elements_signature_hash(
     tx: &elements::Transaction,
     index: usize,
-    script: &[u8],
+    script_code: &bitcoin::Script,
     value: &elements::confidential::Value,
     sighash: u32,
-    flags: u32,
+    segwit: bool,
 ) -> sha256d::Hash {
-    let wally_tx = tx.into();
+    let flags = match segwit {
+        false => 0,
+        true => ffi::WALLY_TX_FLAG_USE_WITNESS,
+    };
+
+    let tx_bytes = serialize(tx);
+    let mut wally_tx = ptr::null();
+    let ret = unsafe {
+        ffi::wally_tx_from_bytes(
+            tx_bytes.as_ptr(),
+            tx_bytes.len(),
+            flags | ffi::WALLY_TX_FLAG_USE_ELEMENTS,
+            &mut wally_tx,
+        )
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+
     let value = serialize(value);
-    let mut out = [0u8; 32];
+    let mut out = [0u8; sha256d::Hash::LEN];
     let ret = unsafe {
         ffi::wally_tx_get_elements_signature_hash(
-            &wally_tx,
+            wally_tx,
             index,
-            script.as_ptr(),
-            script.len(),
+            script_code.as_bytes().as_ptr(),
+            script_code.as_bytes().len(),
             value.as_ptr(),
             value.len(),
             sighash,
             flags,
             out.as_mut_ptr(),
-            32,
+            sha256d::Hash::LEN,
         )
     };
     assert_eq!(ret, ffi::WALLY_OK);
-    //TODO(stevenroose) use from_inner with hashes 0.7
+    //TODO(stevenroose) use from_inner with hashes 0.7 in bitcoin 0.19
     sha256d::Hash::from_slice(&out[..]).unwrap()
 }
 
@@ -543,7 +299,6 @@ pub fn asset_blinding_key_to_ec_private_key(
     assert_eq!(ret, ffi::WALLY_OK);
     secp256k1::SecretKey::from_slice(&out).expect("size is 32")
 }
-
 
 #[cfg(test)]
 mod tests {

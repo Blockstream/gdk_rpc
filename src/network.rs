@@ -55,9 +55,9 @@ lazy_static! {
             Network {
                 name: "Regtest".to_string(),
                 network: "regtest".to_string(),
-                rpc_url,
+                rpc_url: rpc_url.clone(),
                 rpc_cred: None,
-                rpc_cookie: rpc_cookie,
+                rpc_cookie: rpc_cookie.clone(),
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
 
@@ -67,6 +67,35 @@ lazy_static! {
 
                 development: true, // TODO
                 liquid: false,
+                mainnet: false,
+
+                default_peers: vec![],
+                service_chain_code: "".to_string(),
+                service_pubkey: "".to_string(),
+                wamp_onion_url: "".to_string(),
+                wamp_url: "".to_string(),
+                wamp_cert_pins: vec![],
+                wamp_cert_roots: vec![],
+            },
+        );
+
+        networks.insert(
+            "elementsregtest-cookie".to_string(),
+            Network {
+                name: "Elements Regtest".to_string(),
+                network: "elementsregtest".to_string(),
+                rpc_url,
+                rpc_cred: None,
+                rpc_cookie: rpc_cookie,
+                tx_explorer_url: "https://blockstream.info/tx/".to_string(),
+                address_explorer_url: "https://blockstream.info/address/".to_string(),
+
+                bech32_prefix: "ert".to_string(),
+                p2pkh_version: 235,
+                p2sh_version: 75,
+
+                development: true, // TODO
+                liquid: true,
                 mainnet: false,
 
                 default_peers: vec![],
