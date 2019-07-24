@@ -23,9 +23,9 @@ cargo build
 
 ## Building for Android
 
-Download ndk r19b
+Download ndk r20
 
-export ANDROID_NDK=location_of_unzipped_ndk_r19b
+export ANDROID_NDK=location_of_unzipped_ndk_r20
 
 You will also need to run (one off)
 
