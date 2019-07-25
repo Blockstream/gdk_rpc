@@ -5,7 +5,27 @@ test_gdk_rpc_rust_c:
     - cd $CI_PROJECT_DIR
     - source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all --release && ./test.sh
 
-test_gdk_rpc_rust_c_ndk:
+test_gdk_rpc_rust_c_clang:
   script:
     - cd $CI_PROJECT_DIR
-    - ./ndk.sh
+    - ./build_deps.sh
+
+test_gdk_rpc_rust_c_ndk_armv7:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./ndk.sh armeabi-v7a
+
+test_gdk_rpc_rust_c_ndk_arm64:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./ndk.sh arm64-v8a
+
+test_gdk_rpc_rust_c_ndk_x86_64:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./ndk.sh x86_64
+
+test_gdk_rpc_rust_c_ndk_x86:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./ndk.sh x86

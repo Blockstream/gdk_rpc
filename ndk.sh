@@ -27,7 +27,7 @@ if [ -n "$1" ]; then
     ARCH_LIST="$1"
 fi
 
-# FIXME: we don't need to build everything but just libswig_java.a, libwallycore.a, libsecp256k1.a
+# FIXME: we don't need to build everything but just libswig_java.a, libwallycore.a, libsecp256k1.a libevent*.a libssl*.a libzlib*.a libtor*.a
 
 if [ ! -f ${GDK_LOCATION}/build-clang-android-x86/android_x86_ndk.txt ]; then
     oldpath=$(pwd)
@@ -75,23 +75,23 @@ cp -nrf ${GDK_LOCATION}/build-clang-android-*/libwally-core/src/swig_java/src/co
 cp -nrf ${GDK_LOCATION}/build-clang-android-*/src/swig_java/com/blockstream/libgreenaddress/GDK.java gdk-android-jni/java/com/blockstream/libgreenaddress
 
 if [[ "${ARCH_LIST/x86_64/}" == *"x86"* ]]; then
-    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android19-clang -flto -fPIC -shared -o $jni_lib_path/x86/libgreenaddress.so -Wl,--whole-archive target/i686-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-19/arch-x86/usr/lib/liblog.so -Wl,--no-whole-archive  -lm
+    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android19-clang -flto -fPIC -shared -o $jni_lib_path/x86/libgreenaddress.so -Wl,--whole-archive target/i686-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-19/arch-x86/usr/lib/liblog.so -Wl,--no-whole-archive -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android-strip $jni_lib_path/x86/libgreenaddress.so
 
 fi
 
 if [[ $ARCH_LIST == *"x86_64"* ]]; then
-    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang -flto -fPIC -shared -o $jni_lib_path/x86_64/libgreenaddress.so -Wl,--whole-archive target/x86_64-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86_64/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-21/arch-x86_64/usr/lib64/liblog.so -Wl,--no-whole-archive  -lm
+    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang -flto -fPIC -shared -o $jni_lib_path/x86_64/libgreenaddress.so -Wl,--whole-archive target/x86_64-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-x86_64/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-x86_64/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-21/arch-x86_64/usr/lib64/liblog.so -Wl,--no-whole-archive -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-strip $jni_lib_path/x86_64/libgreenaddress.so
 fi
 
 if [[ $ARCH_LIST == *"armeabi-v7a"* ]]; then
-    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi19-clang -flto -fPIC -shared -o $jni_lib_path/armeabi-v7a/libgreenaddress.so -Wl,--whole-archive target/armv7-linux-androideabi/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-19/arch-arm/usr/lib/liblog.so -Wl,--no-whole-archive  -lm
+    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi19-clang -flto -fPIC -shared -o $jni_lib_path/armeabi-v7a/libgreenaddress.so -Wl,--whole-archive target/armv7-linux-androideabi/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-armeabi-v7a/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-19/arch-arm/usr/lib/liblog.so -Wl,--no-whole-archive -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/arm-linux-androideabi-strip $jni_lib_path/armeabi-v7a/libgreenaddress.so
 fi
 
 if [[ $ARCH_LIST == *"arm64-v8a"* ]]; then
-    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang -flto -fPIC -shared -o $jni_lib_path/arm64-v8a/libgreenaddress.so -Wl,--whole-archive target/aarch64-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-21/arch-arm64/usr/lib/liblog.so -Wl,--no-whole-archive  -lm
+    ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang -flto -fPIC -shared -o $jni_lib_path/arm64-v8a/libgreenaddress.so -Wl,--whole-archive target/aarch64-linux-android/release/libgdk_rpc.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/src/swig_java/libswig_java.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/libwally-core/build/lib/libwallycore.a ${GDK_LOCATION}/build-clang-android-arm64-v8a/libwally-core/build/lib/libsecp256k1.a ${ANDROID_NDK}/platforms/android-21/arch-arm64/usr/lib/liblog.so -Wl,--no-whole-archive -lm
     ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-strip $jni_lib_path/arm64-v8a/libgreenaddress.so
 fi
 
