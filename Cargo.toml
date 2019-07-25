@@ -9,7 +9,8 @@ edition = "2018"
 crate-type = ["dylib"]
 
 [features]
-default = []
+default = ["liquid"]
+liquid = ["elements"]
 android_logger = ["android_log"]
 stderr_logger = ["stderrlog"]
 
@@ -33,6 +34,13 @@ log = "0.4"
 stderrlog = { version = "0.4", optional = true }
 android_log = { version = "0.1", optional = true }
 url = "1.7.2"
+
+[dependencies.elements]
+version = "0.7.1"
+optional = true
+
+[build-dependencies]
+cc = "1.0"
 
 [profile.release]
 lto = false

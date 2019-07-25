@@ -5,6 +5,8 @@ extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
 extern crate chrono;
 extern crate dirs;
+#[cfg(feature = "liquid")]
+extern crate elements;
 extern crate jsonrpc;
 extern crate libc;
 extern crate secp256k1;
@@ -33,6 +35,8 @@ pub mod session;
 pub mod settings;
 pub mod util;
 pub mod wallet;
+#[cfg(feature = "liquid")]
+pub mod wally;
 
 use serde_json::{from_value, Value};
 
