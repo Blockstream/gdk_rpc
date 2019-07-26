@@ -1,5 +1,6 @@
 [package]
 name = "gdk-rpc"
+build = "build.rs"
 version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 license = "(MIT)"
