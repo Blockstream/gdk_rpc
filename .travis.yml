@@ -14,11 +14,11 @@ matrix:
   include:
     # fmt checks and release build
     - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --all --release"
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && ./builds_depsh.sh && cargo build --all --release"
 
     # unit tests
     - script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && ./test.sh"
+        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && ./build_deps.sh && ./test.sh"
 
     - script:
         - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && source /root/.cargo/env && ./builds_deps.sh"
