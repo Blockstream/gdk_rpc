@@ -3,6 +3,7 @@ set -eo pipefail
 
 if [ -f /.dockerenv ]; then
     export PATH=${PATH}:/bitcoin/bin:/liquid/bin
+    source /root/.cargo/env
 fi
 
 bitcoind -server=1 -regtest -daemon
