@@ -47,6 +47,7 @@ rm liquid.tar.gz
 
 git clone --quiet --depth 1 --single-branch --branch release_0.0.17 https://github.com/Blockstream/gdk.git
 pip3 install --require-hashes -r /gdk/tools/requirements.txt
+export GDK_LOCATION=/gdk
 
 
 if [ -f /.dockerenv ]; then
