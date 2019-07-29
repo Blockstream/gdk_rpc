@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -12,8 +13,8 @@ lazy_static! {
     pub static ref SECP: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 }
 
-pub fn make_str(data: String) -> *const c_char {
-    CString::new(data).unwrap().into_raw()
+pub fn make_str<'a, S: Into<Cow<'a, str>>>(data: S) -> *const c_char {
+    CString::new(data.into().into_owned()).unwrap().into_raw()
 }
 
 pub fn read_str(s: *const c_char) -> String {

@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use std::{cell, fmt};
 
-use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bitcoin::{
     consensus::{deserialize, serialize},
     util::bip143,
@@ -20,7 +19,8 @@ use serde_json::Value;
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::{Error, OptionExt};
 use crate::network::{Network, NetworkId};
-use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
+use crate::util::{btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
+use crate::wally;
 
 type JsonMap = HashMap<String, Value>;
 
@@ -152,13 +152,12 @@ impl Wallet {
     /// - the master xpriv
     /// - the external address xpriv
     /// - the internal address xpriv
-    fn calc_seeds(
-        mnemonic: &Mnemonic,
+    fn calc_xkeys(
+        seed: &[u8],
     ) -> (bip32::ExtendedPrivKey, bip32::ExtendedPrivKey, bip32::ExtendedPrivKey) {
-        let seed = Seed::new(&mnemonic, "");
         // Network isn't of importance here.
         let master_xpriv =
-            bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, seed.as_bytes()).unwrap();
+            bip32::ExtendedPrivKey::new_master(BNetwork::Bitcoin, &seed[..]).unwrap();
         // Add BIP-44 derivations for external and internal addresses.
         let external_xpriv = master_xpriv
             .derive_priv(&SECP, &bip32::DerivationPath::from_str("m/44'/0'/0'/0'/0").unwrap())
@@ -171,8 +170,8 @@ impl Wallet {
 
     /// Register a new [Wallet].
     pub fn register(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
-        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
+        let seed = wally::bip39_mnemonic_to_seed(&mnemonic, "")?;
+        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_xkeys(&seed);
         let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
         // create the wallet in Core
@@ -190,7 +189,11 @@ impl Wallet {
         let state_addr = Wallet::persistent_state_address(network.id(), &master_xpriv);
         match Wallet::load_persistent_state(&rpc, &state_addr) {
             Err(Error::WalletNotRegistered) => {} // good
-            _ => return Err(Error::WalletAlreadyRegistered),
+            Ok(_) => return Err(Error::WalletAlreadyRegistered),
+            Err(e) => {
+                warn!("Unexpected error while registering wallet: {}", e);
+                return Err(e);
+            }
         }
 
         let wallet = Wallet {
@@ -212,8 +215,8 @@ impl Wallet {
 
     /// Login to an existing [Wallet].
     pub fn login(network: &'static Network, mnemonic: &str) -> Result<Wallet, Error> {
-        let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
-        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_seeds(&mnem);
+        let seed = wally::bip39_mnemonic_to_seed(&mnemonic, "")?;
+        let (master_xpriv, external_xpriv, internal_xpriv) = Wallet::calc_xkeys(&seed);
         let fp = hex::encode(master_xpriv.fingerprint(&SECP).as_bytes());
 
         let tmp_rpc = network.connect(None)?;
@@ -667,25 +670,6 @@ impl fmt::Debug for Wallet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Wallet {{ }}")
     }
-}
-
-pub fn mnemonic_to_hex(mnemonic: &String) -> Result<String, Error> {
-    let mnem = Mnemonic::from_phrase(&mnemonic[..], Language::English).map_err(Error::Bip39)?;
-    Ok(hex::encode(mnem.entropy()))
-}
-
-pub fn hex_to_mnemonic(hex: &String) -> Result<String, Error> {
-    let bytes = hex::decode(hex)?;
-    let mnem = Mnemonic::from_entropy(&bytes, Language::English).map_err(Error::Bip39)?;
-    Ok(mnem.into_phrase())
-}
-
-pub fn generate_mnemonic() -> String {
-    Mnemonic::new(MnemonicType::Words24, Language::English).into_phrase()
-}
-
-pub fn validate_mnemonic(mnemonic: String) -> bool {
-    Mnemonic::validate(&mnemonic, Language::English).is_ok()
 }
 
 fn format_gdk_tx(

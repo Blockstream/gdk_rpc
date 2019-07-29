@@ -8,12 +8,14 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-extern crate bip39;
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
+extern crate rand;
 extern crate secp256k1;
 extern crate url;
+
+//extern crate gdk_rpc;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -26,6 +28,7 @@ use bitcoincore_rpc::RpcApi;
 use serde_json::Value;
 
 const GA_OK: i32 = 0;
+const GA_ERROR: i32 = -1;
 const GA_TRUE: u32 = 1;
 const GA_FALSE: u32 = 0;
 
@@ -203,17 +206,20 @@ fn setup() -> *mut GA_session {
 
     let hw_device = make_json(json!({ "type": "trezor" }));
     // generate a new mnemonic
-    let mnemonic = bip39::Mnemonic::new(bip39::MnemonicType::Words12, bip39::Language::English);
-    let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
+    let mut mnemonic_ptr: *const c_char = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic_ptr) });
+    //let mnemonic = read_str(mnemonic);
+    //let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
+
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
-        GA_register_user(sess, hw_device, mnemonic_c.as_ptr(), &mut auth_handler)
+        GA_register_user(sess, hw_device, mnemonic_ptr, &mut auth_handler)
     });
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     let password = CString::new("").unwrap();
     assert_eq!(GA_OK, unsafe {
-        GA_login(sess, hw_device, mnemonic_c.as_ptr(), password.as_ptr(), &mut auth_handler)
+        GA_login(sess, hw_device, mnemonic_ptr, password.as_ptr(), &mut auth_handler)
     });
 
     sess
@@ -273,7 +279,7 @@ fn test_account() {
 
     let hw_device = make_json(json!({ "type": "trezor" }));
     let mnemonic =
-        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
+        "guilt wheat author asset pledge element again humble six trouble pig write cigar ecology copy blanket tackle pupil doll one media lift ability episode".to_string();
     let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
@@ -494,8 +500,7 @@ fn test_pin() {
     let sess = setup();
 
     let mnemonic =
-        "plunge wash chimney soap magic luggage bulk mixed chuckle utility come light".to_string();
-
+        "guilt wheat author asset pledge element again humble six trouble pig write cigar ecology copy blanket tackle pupil doll one media lift ability episode".to_string();
     let mnemonic = CString::new(mnemonic).unwrap();
     let pin = CString::new("1234").unwrap();
     let device_id = CString::new("foo").unwrap();
@@ -503,6 +508,7 @@ fn test_pin() {
     assert_eq!(GA_OK, unsafe {
         GA_set_pin(sess, mnemonic.as_ptr(), pin.as_ptr(), device_id.as_ptr(), &mut pin_data)
     });
+
     let pin_data = read_json(pin_data);
     debug!("pin data: {:?}", pin_data);
 
@@ -567,7 +573,10 @@ fn test_persist_wallet() {
     let sess = setup_nologin();
 
     // Some variables that we reuse.
-    let mnemonic = bip39::Mnemonic::new(bip39::MnemonicType::Words12, bip39::Language::English);
+    let entropy: [u8; 32] = rand::random();
+    let mut mnemonic_ptr: *const c_char = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_generate_mnemonic(&mut mnemonic_ptr) });
+    let mnemonic = read_str(mnemonic_ptr);
     let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
     let hw_device = make_json(json!({ "type": "trezor" }));
     let password = CString::new("").unwrap();
