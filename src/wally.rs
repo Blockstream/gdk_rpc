@@ -2,11 +2,13 @@
 //! Links to libwally methods used.
 //!
 
-use std::ffi::CString;
 use std::ptr;
 
 use bitcoin::consensus::encode::serialize;
 use bitcoin_hashes::{sha256d, Hash};
+
+use crate::errors::Error;
+use crate::util::{make_str, read_str};
 
 mod ffi {
     use std::ops::Drop;
@@ -309,12 +311,41 @@ mod ffi {
     }
 
     #[repr(C)]
-    pub struct Words {
+    pub struct WordList {
         _private: [u8; 0],
     }
 
     extern "C" {
-        pub fn wally_is_elements_build() -> c_int;
+        //WALLY_CORE_API int bip39_get_wordlist(
+        //    const char *lang,
+        //    struct words **output);
+        pub fn bip39_get_wordlist(lang: *const c_char, output: *mut *const WordList) -> c_int;
+
+        //WALLY_CORE_API int bip39_mnemonic_from_bytes(
+        //    const struct words *w,
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    char **output);
+        pub fn bip39_mnemonic_from_bytes(
+            word_list: *const WordList,
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            output: *mut *const c_char,
+        ) -> c_int;
+
+        //WALLY_CORE_API int bip39_mnemonic_to_bytes(
+        //    const struct words *w,
+        //    const char *mnemonic,
+        //    unsigned char *bytes_out,
+        //    size_t len,
+        //    size_t *written);
+        pub fn bip39_mnemonic_to_bytes(
+            word_list: *const WordList,
+            mnemonic: *const c_char,
+            bytes_out: *mut c_uchar,
+            len: size_t,
+            written: *mut size_t,
+        ) -> c_int;
 
         //WALLY_CORE_API int bip39_mnemonic_to_seed(
         //    const char *mnemonic,
@@ -330,17 +361,17 @@ mod ffi {
             written: *mut size_t,
         ) -> c_int;
 
-        //WALLY_CORE_API int bip39_get_wordlist(
-        //    const char *lang,
-        //    struct words **output);
-        pub fn bip39_get_wordlist(lang: *const c_char, output: *mut *const Words) -> c_int;
-
         //WALLY_CORE_API int bip39_mnemonic_validate(
         //    const struct words *w,
         //    const char *mnemonic);
-        pub fn bip39_mnemonic_validate(word_list: *const Words, mnemonic: *const c_char) -> c_int;
+        pub fn bip39_mnemonic_validate(
+            word_list: *const WordList,
+            mnemonic: *const c_char,
+        ) -> c_int;
 
         //WALLY_CORE_API int wally_tx_get_elements_signature_hash(
+        pub fn wally_is_elements_build() -> c_int;
+
         //  const struct wally_tx *tx,
         //  size_t index,
         //  const unsigned char *script, size_t script_len,
@@ -362,36 +393,77 @@ mod ffi {
     }
 }
 
-/// Convert the mnemonic phrase and passphrase to a binary seed.
-pub fn bip39_mnemonic_to_seed(mnemonic: &str, passphrase: &str) -> [u8; 64] {
-    // First let's validate the mnemonic.
+/// Get a static reference to the english bip39 wordlist.
+unsafe fn bip39_get_wordlist() -> *const ffi::WordList {
     let mut word_list = ptr::null();
-    let ret = unsafe { ffi::bip39_get_wordlist(ptr::null(), &mut word_list) };
-    debug_assert!(ret == ffi::WALLY_OK);
-    let c_mnemonic = CString::new(mnemonic).expect("no nul in str");
-    let ret = unsafe { ffi::bip39_mnemonic_validate(word_list, c_mnemonic.as_ptr()) };
-    if ret != ffi::WALLY_OK {
-        //TODO(stevenroose) return error
-        panic!("invalid mnemonic!");
-    }
+    let ret = ffi::bip39_get_wordlist(ptr::null(), &mut word_list);
+    assert_eq!(ret, ffi::WALLY_OK);
+    word_list
+}
 
-    // Then generate the seed.
-    let c_mnemonic = CString::new(mnemonic).expect("no nul in str");
-    let c_passphrase = CString::new(passphrase).expect("no nul in str");
-    let mut out = [0u8; 64];
+/// Generate a BIP39 mnemonic from entropy bytes.
+pub fn bip39_mnemonic_from_bytes(entropy: &[u8]) -> String {
+    let mut out = ptr::null();
+    let ret = unsafe {
+        ffi::bip39_mnemonic_from_bytes(
+            bip39_get_wordlist(),
+            entropy.as_ptr(),
+            entropy.len(),
+            &mut out,
+        )
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+    read_str(out)
+}
+
+/// Validate the validity of a BIP-39 mnemonic.
+pub fn bip39_mnemonic_validate(mnemonic: &str) -> Result<(), Error> {
+    let ret = unsafe { ffi::bip39_mnemonic_validate(bip39_get_wordlist(), make_str(mnemonic)) };
+    if ret == ffi::WALLY_OK {
+        Ok(())
+    } else {
+        Err(Error::InvalidMnemonic)
+    }
+}
+
+/// Convert the mnemonic back into the entropy bytes.
+pub fn bip39_mnemonic_to_bytes(mnemonic: &str) -> Result<Vec<u8>, Error> {
+    bip39_mnemonic_validate(mnemonic)?;
+
+    let c_mnemonic = make_str(mnemonic);
+    let mut out = Vec::with_capacity(32);
     let mut written = 0usize;
     let ret = unsafe {
-        ffi::bip39_mnemonic_to_seed(
-            c_mnemonic.as_ptr(),
-            c_passphrase.as_ptr(),
+        ffi::bip39_mnemonic_to_bytes(
+            bip39_get_wordlist(),
+            c_mnemonic,
             out.as_mut_ptr(),
-            64,
+            32,
             &mut written,
         )
     };
-    debug_assert!(ret == ffi::WALLY_OK);
-    debug_assert!(written == 64);
-    out
+    assert_eq!(ret, ffi::WALLY_OK);
+    assert!(written <= 32);
+    unsafe {
+        out.set_len(written);
+    }
+    Ok(out)
+}
+
+/// Convert the mnemonic phrase and passphrase to a binary seed.
+pub fn bip39_mnemonic_to_seed(mnemonic: &str, passphrase: &str) -> Result<[u8; 64], Error> {
+    bip39_mnemonic_validate(mnemonic)?;
+
+    let c_mnemonic = make_str(mnemonic);
+    let c_passphrase = make_str(passphrase);
+    let mut out = [0u8; 64];
+    let mut written = 0usize;
+    let ret = unsafe {
+        ffi::bip39_mnemonic_to_seed(c_mnemonic, c_passphrase, out.as_mut_ptr(), 64, &mut written)
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+    assert_eq!(written, 64);
+    Ok(out)
 }
 
 pub fn tx_get_elements_signature_hash(
@@ -419,7 +491,7 @@ pub fn tx_get_elements_signature_hash(
             32,
         )
     };
-    debug_assert!(ret == ffi::WALLY_OK);
+    assert_eq!(ret, ffi::WALLY_OK);
     //TODO(stevenroose) use from_inner with hashes 0.7
     sha256d::Hash::from_slice(&out[..]).unwrap()
 }
@@ -427,17 +499,21 @@ pub fn tx_get_elements_signature_hash(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bip39;
     use hex;
 
     #[test]
     fn test_bip39_mnemonic_to_seed() {
         // test vector from the BIP spec
-        let mnem = "hamster diagram private dutch cause delay private meat slide toddler razor book happy fancy gospel tennis maple dilemma loan word shrug inflict delay length";
-        let seed_hex = "64c87cde7e12ecf6704ab95bb1408bef047c22db4cc7491c4271d170a1b213d20b385bc1588d9c7b38f1b39d415665b8a9030c9ec653d75e65f847d8fc1fc440";
-        let passphrase = "TREZOR";
+        let v_entropy = "68a79eaca2324873eacc50cb9c6eca8cc68ea5d936f98787c60c7ebc74e6ce7c";
+        let v_mnem = "hamster diagram private dutch cause delay private meat slide toddler razor book happy fancy gospel tennis maple dilemma loan word shrug inflict delay length";
+        let v_seed = "64c87cde7e12ecf6704ab95bb1408bef047c22db4cc7491c4271d170a1b213d20b385bc1588d9c7b38f1b39d415665b8a9030c9ec653d75e65f847d8fc1fc440";
+        let v_passphrase = "TREZOR";
 
-        let seed = bip39_mnemonic_to_seed(&mnem, &passphrase);
-        assert_eq!(seed_hex, &hex::encode(&seed[..]));
+        let mnemonic = bip39_mnemonic_from_bytes(&hex::decode(v_entropy).unwrap());
+        assert_eq!(mnemonic, v_mnem);
+        assert!(bip39_mnemonic_validate(&mnemonic).is_ok());
+        assert_eq!(hex::encode(&bip39_mnemonic_to_bytes(&mnemonic).unwrap()), v_entropy);
+        let seed = bip39_mnemonic_to_seed(&mnemonic, &v_passphrase).unwrap();
+        assert_eq!(v_seed, &hex::encode(&seed[..]));
     }
 }

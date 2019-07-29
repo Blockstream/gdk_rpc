@@ -27,6 +27,8 @@ pub enum Error {
     WalletNotRegistered,
     /// User tried to register a wallet that was already registered.
     WalletAlreadyRegistered,
+    /// Mnemonics should be phrases of 24 words.
+    InvalidMnemonic,
 
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),

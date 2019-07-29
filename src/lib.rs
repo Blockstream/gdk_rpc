@@ -9,6 +9,7 @@ extern crate dirs;
 extern crate elements;
 extern crate jsonrpc;
 extern crate libc;
+extern crate rand;
 extern crate secp256k1;
 extern crate serde;
 #[macro_use]
@@ -17,7 +18,6 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
@@ -53,9 +53,7 @@ use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
 use crate::util::{extend, log_filter, make_str, read_str};
-use crate::wallet::{
-    generate_mnemonic, hex_to_mnemonic, mnemonic_to_hex, validate_mnemonic, Wallet,
-};
+use crate::wallet::Wallet;
 
 lazy_static! {
     static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
@@ -518,7 +516,8 @@ pub extern "C" fn GA_get_subaccount(
 
 #[no_mangle]
 pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
-    let mnemonic = generate_mnemonic();
+    let entropy: [u8; 32] = rand::random();
+    let mnemonic = wally::bip39_mnemonic_from_bytes(&entropy[..]);
 
     ok!(ret, make_str(mnemonic))
 }
@@ -526,10 +525,11 @@ pub extern "C" fn GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -> i32 {
     let mnemonic = read_str(mnemonic);
-    let is_valid = if validate_mnemonic(mnemonic) {
-        GA_TRUE
-    } else {
+    let is_valid = if let Err(e) = wally::bip39_mnemonic_validate(&mnemonic) {
+        warn!("Invalid mnemonic \"{}\": {}", mnemonic, e);
         GA_FALSE
+    } else {
+        GA_TRUE
     };
 
     ok!(ret, is_valid)
@@ -813,7 +813,7 @@ pub extern "C" fn GA_set_pin(
 ) -> i32 {
     let mnemonic = read_str(mnemonic);
     let device_id = read_str(device_id);
-    let mnemonic_hex = tryit!(mnemonic_to_hex(&mnemonic));
+    let mnemonic_hex = hex::encode(&tryit!(wally::bip39_mnemonic_to_bytes(&mnemonic)));
 
     // FIXME setting a PIN does not actually do anything, just a successful no-op
     ok_json!(
@@ -837,8 +837,9 @@ pub extern "C" fn GA_login_with_pin(
     let sess = sm.get_mut(sess).unwrap();
 
     let pin_data = &unsafe { &*pin_data }.0;
-    let mnemonic_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
-    let mnemonic = tryit!(hex_to_mnemonic(&mnemonic_hex));
+    let entropy_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
+    let entropy = tryit!(hex::decode(&entropy_hex));
+    let mnemonic = wally::bip39_mnemonic_from_bytes(&entropy);
 
     debug!("GA_login_with_pin mnemonic: {}", mnemonic);
     let network = tryit!(sess.network.or_err("session not connected"));
