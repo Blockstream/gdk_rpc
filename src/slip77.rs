@@ -7,7 +7,7 @@ const SLIP77_DERIVATION: &'static str = "SLIP-0077";
 
 /// A SLIP-77 master blinding key used to derive shared blinding keys.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MasterBlindingKey(secp256k1::SecretKey);
+pub struct MasterBlindingKey(pub secp256k1::SecretKey);
 
 impl MasterBlindingKey {
     /// Create a new master blinding key from a seed.

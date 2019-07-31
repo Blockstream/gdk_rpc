@@ -112,6 +112,35 @@ mod ffi {
             bytes_out: *mut c_uchar,
             len: usize,
         ) -> c_int;
+
+        //WALLY_CORE_API int wally_asset_blinding_key_from_seed(
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    unsigned char *bytes_out,
+        //    size_t len);
+        pub fn wally_asset_blinding_key_from_seed(
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            bytes_out: *mut c_uchar,
+            len: size_t,
+        ) -> c_int;
+
+        //WALLY_CORE_API int wally_asset_blinding_key_to_ec_private_key(
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    const unsigned char *script,
+        //    size_t script_len,
+        //    unsigned char *bytes_out,
+        //    size_t len);
+        //    }
+        pub fn wally_asset_blinding_key_to_ec_private_key(
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            script: *const c_uchar,
+            script_len: size_t,
+            bytes_out: *mut c_uchar,
+            len: size_t,
+        ) -> c_int;
     }
 }
 
@@ -237,6 +266,33 @@ pub fn tx_get_elements_signature_hash(
     sha256d::Hash::from_slice(&out[..]).unwrap()
 }
 
+unsafe fn test_slip77() {
+    use crate::slip77;
+    use rand;
+    
+    let seed: [u8; 32] = rand::random();
+    let mbk1 = slip77::MasterBlindingKey::new(&seed[..]);
+    let mbk2 = {
+        let mut mbk = [0u8; 32];
+        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_from_seed(seed.as_ptr(), 64, mbk.as_mut_ptr(), 32));
+        mbk
+    };
+    assert_eq!(mbk1.0, secp256k1::SecretKey::from_slice(&mbk2[..]).unwrap());
+
+    let scriptpkb = hex::decode("a914afa92d77cd3541b443771649572db096cf49bf8c87").unwrap();
+    let scriptpk: bitcoin::Script = scriptpkb.clone().into();
+
+    let spk1 = mbk1.derive_blinding_key(&scriptpk);
+    let spk2 = {
+        let mut spk = [0u8; 32];
+        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_to_ec_private_key(
+                mbk2.as_ptr(), 32, scriptpkb.as_ptr(), scriptpkb.len(), spk.as_mut_ptr(), 32));
+        spk
+    };
+
+    assert_eq!(spk1, secp256k1::SecretKey::from_slice(&spk2[..]).unwrap());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,5 +312,10 @@ mod tests {
         assert_eq!(hex::encode(&bip39_mnemonic_to_bytes(&mnemonic).unwrap()), v_entropy);
         let seed = bip39_mnemonic_to_seed(&mnemonic, &v_passphrase).unwrap();
         assert_eq!(v_seed, &hex::encode(&seed[..]));
+    }
+
+    #[test]
+    fn test_slip77x() {
+        unsafe {test_slip77() }
     }
 }
