@@ -40,9 +40,6 @@ pub enum Error {
     /// probably have to be reset.
     CorruptNodeData,
 
-    /// The Elements node returned errors when asked to sign a transaction.
-    ElementsCantSign(Vec<bitcoincore_rpc::json::SignRawTransactionResultError>),
-
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),
     Bip39(failure::Error),

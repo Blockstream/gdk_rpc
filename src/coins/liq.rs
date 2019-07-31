@@ -127,7 +127,7 @@ where
             Some(&fund_opts),
             None,
         )?;
-        debug!("funded_tx raw: {:?}", hex::encode(&funded_result.hex));
+        debug!("unsigned tx raw: {:?}", hex::encode(&funded_result.hex));
         let unsigned_tx: Transaction = deserialize(&funded_result.hex)?;
 
         // Get the private keys needed to sign the tx.
@@ -202,6 +202,7 @@ where
             &asset_blinders,
             Some(true), //TODO(stevenroose) set to false and catch error?
         )?;
+        debug!("blinded tx raw: {}", hex::encode(&serialize(&blinded_tx)));
 
         // Sign the tx.
         let mut signed_tx = blinded_tx.clone(); // keep a totally unsigned copy
@@ -216,7 +217,6 @@ where
                 idx,
                 &script_code,
                 &amountcommitments[idx],
-                //&elements::confidential::Value::Explicit(amounts[idx].as_sat() as u64),
                 bitcoin::SigHashType::All.as_u32(),
                 true, // segwit
             );
@@ -230,8 +230,9 @@ where
                 .into_script();
             signed_tx.input[idx].witness.script_witness = vec![signature, pubkey.to_bytes()];
         }
-        debug!("Signed, unblinded tx: {}", hex::encode(&serialize(&signed_tx)));
+        let raw = serialize(&signed_tx);
+        debug!("signed tx raw: {}", hex::encode(&raw));
 
-        return Ok(serialize(&signed_tx));
+        return Ok(raw);
     }
 }
