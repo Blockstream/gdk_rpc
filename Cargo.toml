@@ -51,7 +51,7 @@ version = "0.1.0"
 optional = true
 
 [profile.release]
-lto = false
+lto = true
 panic = 'abort'
 opt-level = 'z'
 codegen-units = 1

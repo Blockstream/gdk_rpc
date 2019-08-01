@@ -269,7 +269,7 @@ pub fn tx_get_elements_signature_hash(
 unsafe fn test_slip77() {
     use crate::slip77;
     use rand;
-    
+
     let seed: [u8; 32] = rand::random();
     let mbk1 = slip77::MasterBlindingKey::new(&seed[..]);
     let mbk2 = {
