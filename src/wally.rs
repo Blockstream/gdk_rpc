@@ -273,11 +273,11 @@ unsafe fn test_slip77() {
     let seed: [u8; 32] = rand::random();
     let mbk1 = slip77::MasterBlindingKey::new(&seed[..]);
     let mbk2 = {
-        let mut mbk = [0u8; 32];
-        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_from_seed(seed.as_ptr(), 64, mbk.as_mut_ptr(), 32));
+        let mut mbk = [0u8; 64];
+        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_from_seed(seed.as_ptr(), 64, mbk.as_mut_ptr(), 64));
         mbk
     };
-    assert_eq!(mbk1.0, secp256k1::SecretKey::from_slice(&mbk2[..]).unwrap());
+    assert_eq!(mbk1.0, secp256k1::SecretKey::from_slice(&mbk2[0..32]).unwrap());
 
     let scriptpkb = hex::decode("a914afa92d77cd3541b443771649572db096cf49bf8c87").unwrap();
     let scriptpk: bitcoin::Script = scriptpkb.clone().into();
