@@ -1,12 +1,11 @@
 #!/bin/bash
 set -eo pipefail
 
-: ${WALLY_LOCATION?"Need to set WALLY_LOCATION"}
-
 if [ -f /.dockerenv ]; then
     source /root/.cargo/env
 fi
 
+WALLY_LOCATION=$PWD/libwally-core
 CONFIGURE_ARGS="--enable-static --disable-shared --enable-elements --enable-ecmult-static-precomputation"
 CONFIGURE_ARGS="$CONFIGURE_ARGS --disable-swig-java --disable-swig-python"
 CONFIGURE_ARGS="$CONFIGURE_ARGS --disable-dependency-tracking"
