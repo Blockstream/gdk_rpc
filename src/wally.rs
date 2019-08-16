@@ -266,32 +266,40 @@ pub fn tx_get_elements_signature_hash(
     sha256d::Hash::from_slice(&out[..]).unwrap()
 }
 
-unsafe fn test_slip77() {
-    use crate::slip77;
-    use rand;
-
-    let seed: [u8; 32] = rand::random();
-    let mbk1 = slip77::MasterBlindingKey::new(&seed[..]);
-    let mbk2 = {
-        let mut mbk = [0u8; 64];
-        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_from_seed(seed.as_ptr(), 64, mbk.as_mut_ptr(), 64));
-        mbk
+pub fn asset_blinding_key_from_seed(seed: &[u8]) -> [u8; 64] {
+    assert_eq!(seed.len(), 32);
+    let mut out = [0; 64];
+    let ret = unsafe {
+        ffi::wally_asset_blinding_key_from_seed(
+            seed.as_ptr(),
+            seed.len(),
+            out.as_mut_ptr(),
+            out.len(),
+        )
     };
-    assert_eq!(mbk1.0, secp256k1::SecretKey::from_slice(&mbk2[0..32]).unwrap());
-
-    let scriptpkb = hex::decode("a914afa92d77cd3541b443771649572db096cf49bf8c87").unwrap();
-    let scriptpk: bitcoin::Script = scriptpkb.clone().into();
-
-    let spk1 = mbk1.derive_blinding_key(&scriptpk);
-    let spk2 = {
-        let mut spk = [0u8; 32];
-        assert_eq!(ffi::WALLY_OK, ffi::wally_asset_blinding_key_to_ec_private_key(
-                mbk2.as_ptr(), 32, scriptpkb.as_ptr(), scriptpkb.len(), spk.as_mut_ptr(), 32));
-        spk
-    };
-
-    assert_eq!(spk1, secp256k1::SecretKey::from_slice(&spk2[..]).unwrap());
+    assert_eq!(ret, ffi::WALLY_OK);
+    out
 }
+
+pub fn asset_blinding_key_to_ec_private_key(
+    master_blinding_key: &[u8; 64],
+    script_pubkey: &bitcoin::Script,
+) -> secp256k1::SecretKey {
+    let mut out = [0; 32];
+    let ret = unsafe {
+        ffi::wally_asset_blinding_key_to_ec_private_key(
+            master_blinding_key.as_ptr(),
+            master_blinding_key.len(),
+            script_pubkey.as_bytes().as_ptr(),
+            script_pubkey.as_bytes().len(),
+            out.as_mut_ptr(),
+            out.len(),
+        )
+    };
+    assert_eq!(ret, ffi::WALLY_OK);
+    secp256k1::SecretKey::from_slice(&out).expect("size is 32")
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -312,10 +320,5 @@ mod tests {
         assert_eq!(hex::encode(&bip39_mnemonic_to_bytes(&mnemonic).unwrap()), v_entropy);
         let seed = bip39_mnemonic_to_seed(&mnemonic, &v_passphrase).unwrap();
         assert_eq!(v_seed, &hex::encode(&seed[..]));
-    }
-
-    #[test]
-    fn test_slip77x() {
-        unsafe {test_slip77() }
     }
 }

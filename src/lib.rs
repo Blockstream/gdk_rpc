@@ -31,8 +31,6 @@ extern crate url;
 extern crate elements;
 #[cfg(feature = "liquid")]
 extern crate liquid_rpc;
-#[cfg(feature = "liquid")]
-extern crate slip21;
 
 pub mod coins;
 pub mod constants;
@@ -45,8 +43,6 @@ pub mod util;
 pub mod wallet;
 
 // Liquid
-#[cfg(feature = "liquid")]
-pub mod slip77;
 #[cfg(feature = "liquid")]
 pub mod wally;
 

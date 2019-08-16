@@ -11,7 +11,7 @@ crate-type = ["dylib"]
 
 [features]
 default = ["liquid"]
-liquid = ["elements", "liquid-rpc", "slip21"]
+liquid = ["elements", "liquid-rpc"]
 android_logger = ["android_log"]
 stderr_logger = ["stderrlog"]
 
@@ -44,10 +44,6 @@ optional = true
 [dependencies.liquid-rpc]
 git = "https://github.com/stevenroose/rust-liquid-rpc.git"
 branch = "master"
-optional = true
-
-[dependencies.slip21]
-version = "0.1.0"
 optional = true
 
 [profile.release]

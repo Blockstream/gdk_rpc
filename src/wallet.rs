@@ -30,8 +30,6 @@ use crate::network::{Network, NetworkId};
 use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, SECP};
 
 #[cfg(feature = "liquid")]
-use crate::slip77;
-#[cfg(feature = "liquid")]
 use crate::wally;
 
 const PER_PAGE: usize = 30;
@@ -106,7 +104,7 @@ pub struct Wallet {
     internal_xpriv: bip32::ExtendedPrivKey,
     /// The master blinding key.
     #[cfg(feature = "liquid")]
-    master_blinding_key: slip77::MasterBlindingKey,
+    master_blinding_key: [u8; 64],
 
     next_external_child: cell::Cell<bip32::ChildNumber>,
     next_internal_child: cell::Cell<bip32::ChildNumber>,
@@ -229,7 +227,7 @@ impl Wallet {
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
             #[cfg(feature = "liquid")]
-            master_blinding_key: slip77::MasterBlindingKey::new(&seed),
+            master_blinding_key: wally::asset_blinding_key_from_seed(&seed),
             next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
@@ -260,7 +258,7 @@ impl Wallet {
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
             #[cfg(feature = "liquid")]
-            master_blinding_key: slip77::MasterBlindingKey::new(&seed),
+            master_blinding_key: wally::asset_blinding_key_from_seed(&seed),
             next_external_child: cell::Cell::new(state.next_external_child),
             next_internal_child: cell::Cell::new(state.next_internal_child),
             tip: None,
@@ -508,8 +506,10 @@ impl Wallet {
                     None,
                     coins::liq::address_params(enet),
                 );
-                let blinding_key =
-                    self.master_blinding_key.derive_blinding_key(&addr.script_pubkey());
+                let blinding_key = wally::asset_blinding_key_to_ec_private_key(
+                    &self.master_blinding_key,
+                    &addr.script_pubkey(),
+                );
                 let blinding_pubkey = secp256k1::PublicKey::from_secret_key(&SECP, &blinding_key);
                 addr.blinding_pubkey = Some(blinding_pubkey);
 
