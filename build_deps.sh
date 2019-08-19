@@ -21,5 +21,4 @@ if [ ! -d $PWD/bld ]; then
     export LDFLAGS="$LDFLAGS -flto"
     ./configure $CONFIGURE_ARGS
     make -j$(cat /proc/cpuinfo | grep ^processor | wc -l) install
-    cd $oldpath
 fi
