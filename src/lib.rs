@@ -48,7 +48,6 @@ pub mod wally;
 
 use serde_json::{from_value, Value};
 
-use std::ffi::CString;
 use std::mem::transmute;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
@@ -56,7 +55,7 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
 
-use crate::constants::{GA_ERROR, GA_FALSE, GA_MEMO_USER, GA_OK, GA_TRUE};
+use crate::constants::{GA_ERROR, GA_MEMO_USER, GA_OK};
 use crate::errors::OptionExt;
 use crate::network::Network;
 use crate::session::{spawn_ticker, GA_session, SessionManager};
@@ -535,27 +534,6 @@ pub extern "C" fn GDKRPC_GA_get_subaccount(
 //
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_GA_generate_mnemonic(ret: *mut *const c_char) -> i32 {
-    let entropy: [u8; 32] = rand::random();
-    let mnemonic = wally::bip39_mnemonic_from_bytes(&entropy[..]);
-
-    ok!(ret, make_str(mnemonic))
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_validate_mnemonic(mnemonic: *const c_char, ret: *mut u32) -> i32 {
-    let mnemonic = read_str(mnemonic);
-    let is_valid = if let Err(e) = wally::bip39_mnemonic_validate(&mnemonic) {
-        warn!("Invalid mnemonic \"{}\": {}", mnemonic, e);
-        GA_FALSE
-    } else {
-        GA_TRUE
-    };
-
-    ok!(ret, is_valid)
-}
-
-#[no_mangle]
 pub extern "C" fn GDKRPC_GA_get_mnemonic_passphrase(
     sess: *const GA_session,
     _password: *const c_char,
@@ -580,16 +558,6 @@ pub extern "C" fn GDKRPC_GA_auth_handler_get_status(
     let status = auth_handler.to_json();
 
     ok_json!(ret, status)
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_destroy_auth_handler(auth_handler: *const GA_auth_handler) -> i32 {
-    // TODO make sure this works
-    unsafe {
-        drop(&*auth_handler);
-    }
-
-    GA_OK
 }
 
 //
@@ -690,92 +658,6 @@ pub extern "C" fn GDKRPC_GA_change_settings(
 }
 
 //
-// JSON utilities
-//
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32 {
-    let json = &unsafe { &*json }.0;
-    let res = json.to_string();
-    ok!(ret, make_str(res))
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32 {
-    let jstr = read_str(jstr);
-    let json: Value = tryit!(serde_json::from_str(&jstr));
-    ok_json!(ret, json)
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_json_value_to_string(
-    json: *const GA_json,
-    path: *const c_char,
-    ret: *mut *const c_char,
-) -> i32 {
-    let json = &unsafe { &*json }.0;
-    let path = read_str(path);
-    let res = tryit!(json[path].as_str().req());
-    ok!(ret, make_str(res.to_string()))
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_json_value_to_uint32(
-    json: *const GA_json,
-    path: *const c_char,
-    ret: *mut u32,
-) -> i32 {
-    let json = &unsafe { &*json }.0;
-    let path = read_str(path);
-    let res = tryit!(json[path].as_u64().req()) as u32;
-    ok!(ret, res)
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_json_value_to_uint64(
-    json: *const GA_json,
-    path: *const c_char,
-    ret: *mut u64,
-) -> i32 {
-    let json = &unsafe { &*json }.0;
-    let path = read_str(path);
-    let res = tryit!(json[path].as_u64().req());
-    ok!(ret, res)
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_convert_json_value_to_json(
-    json: *const GA_json,
-    path: *const c_char,
-    ret: *mut *const GA_json,
-) -> i32 {
-    let json = &unsafe { &*json }.0;
-    let path = read_str(path);
-    let jstr = tryit!(json[path].as_str().req());
-    let res: Value = tryit!(serde_json::from_str(jstr));
-    ok_json!(ret, res)
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_destroy_json(ptr: *mut GA_json) -> i32 {
-    debug!("GA_destroy_json({:?})", ptr);
-    // TODO make sure this works
-    unsafe {
-        drop(&*ptr);
-    }
-    GA_OK
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_destroy_string(ptr: *mut c_char) -> i32 {
-    unsafe {
-        // retake pointer and drop
-        let _ = CString::from_raw(ptr);
-    }
-    GA_OK
-}
-
-//
 // Unimplemented, but gracefully degrades
 //
 
@@ -786,15 +668,6 @@ pub extern "C" fn GDKRPC_GA_get_system_message(
 ) -> i32 {
     // an empty string implies no system messages
     ok!(ret, make_str("".to_string()))
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_ack_system_message(
-    _sess: *const GA_session,
-    _message_text: *const c_char,
-    ret: *mut *const GA_auth_handler,
-) -> i32 {
-    ok!(ret, GA_auth_handler::success())
 }
 
 #[no_mangle]
@@ -1035,22 +908,12 @@ pub extern "C" fn GDKRPC_GA_register_network(
     GA_ERROR
 }
 
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_get_uniform_uint32_t(_upper_bound: u32, _ret: *mut *const u32) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_GA_get_random_bytes(_num_bytes: u32, _ret: *mut *const c_char, _len: u32) -> i32 {
-    GA_ERROR
-}
-
 //
 // Unit test helper methods
 //
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_GA_test_tick(sess: *mut GA_session) -> i32 {
+pub extern "C" fn GDKRPC_test_tick(sess: *mut GA_session) -> i32 {
     debug!("GA_test_tick()");
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();

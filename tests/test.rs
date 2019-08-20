@@ -17,11 +17,11 @@ extern crate url;
 
 //extern crate gdk_rpc;
 
+use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::Path;
-use std::{env, fs, sync};
-//use std::{thread, time};
+use std::{env, fs, mem, sync, ptr};
 
 use bitcoin_hashes::sha256d;
 use bitcoincore_rpc::RpcApi;
@@ -73,9 +73,6 @@ extern "C" {
         index: u32,
         ret: *mut *const GA_json,
     ) -> i32;
-
-    fn GDKRPC_GA_generate_mnemonic(ret: *mut *const c_char) -> i32;
-    fn GDKRPC_GA_validate_mnemonic(mnemonic: *const c_char, ret: &mut u32) -> i32;
 
     fn GDKRPC_GA_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
     fn GDKRPC_GA_change_settings(
@@ -171,16 +168,10 @@ extern "C" {
         context: *const GA_json,
     ) -> i32;
 
-    fn GDKRPC_GA_convert_json_to_string(json: *const GA_json, ret: *mut *const c_char) -> i32;
-    fn GDKRPC_GA_convert_string_to_json(jstr: *const c_char, ret: *mut *const GA_json) -> i32;
-
-    fn GDKRPC_GA_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
-    fn GDKRPC_GA_destroy_json(json: *const GA_json) -> i32;
     fn GDKRPC_GA_destroy_session(sess: *const GA_session) -> i32;
-    fn GDKRPC_GA_destroy_string(s: *const c_char) -> i32;
 
     // this method only exists for testing purposes
-    fn GDKRPC_GA_test_tick(sess: *mut GA_session) -> i32;
+    fn GDKRPC_test_tick(sess: *mut GA_session) -> i32;
 }
 
 // TODO free up resources
@@ -229,11 +220,7 @@ fn setup() -> *mut GA_session {
 
     let hw_device = make_json(json!({ "type": "trezor" }));
     // generate a new mnemonic
-    let mut mnemonic_ptr: *const c_char = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_generate_mnemonic(&mut mnemonic_ptr) });
-    //let mnemonic = read_str(mnemonic);
-    //let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
-
+    let mut mnemonic_ptr = generate_mnemonic();
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GDKRPC_GA_register_user(sess, hw_device, mnemonic_ptr, &mut auth_handler)
@@ -271,7 +258,7 @@ lazy_static! {
 }
 
 fn tick(sess: *mut GA_session) {
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_test_tick(sess) });
+    assert_eq!(GA_OK, unsafe { GDKRPC_test_tick(sess) });
 }
 
 fn mine_blocks(n: u64) -> Vec<sha256d::Hash> {
@@ -290,7 +277,9 @@ fn test_notifications() {
     let sess = setup_nologin();
 
     let ctx = make_json(json!({ "test": "my ctx" }));
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_set_notification_handler(sess, notification_handler, ctx) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_set_notification_handler(sess, notification_handler, ctx)
+    });
 
     teardown(sess);
 }
@@ -490,7 +479,9 @@ fn send_tx() {
         ]
     }));
     let mut tx_detail_unsigned_ptr: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_create_transaction(sess, details, &mut tx_detail_unsigned_ptr) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_create_transaction(sess, details, &mut tx_detail_unsigned_ptr)
+    });
     let tx_detail_unsigned = read_json(tx_detail_unsigned_ptr);
     info!("create_transaction: {:#?}\n", tx_detail_unsigned);
     let err = tx_detail_unsigned["error"].as_str().unwrap();
@@ -513,25 +504,33 @@ fn send_tx() {
 
     let tx_detail_signed = make_json(sign_status.get("result").unwrap().clone());
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_send_transaction(sess, tx_detail_signed, &mut auth_handler) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_send_transaction(sess, tx_detail_signed, &mut auth_handler)
+    });
     let status = get_status(auth_handler);
     info!("send_transaction status: {:#?}\n", status);
 
     let txid = CString::new(status.pointer("/result/txid").unwrap().as_str().unwrap()).unwrap();
 
     let mut loaded_tx: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
+    });
     info!("loaded broadcasted tx: {:#?}", read_json(loaded_tx));
 
     //warn!("xxxxxxx");
     //::std::thread::sleep(::std::time::Duration::from_secs(160));
 
     let memo = CString::new("hello world").unwrap();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_set_transaction_memo(sess, txid.as_ptr(), memo.as_ptr(), 0) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_set_transaction_memo(sess, txid.as_ptr(), memo.as_ptr(), 0)
+    });
     debug!("set memo");
 
     let mut loaded_tx: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx) });
+    assert_eq!(GA_OK, unsafe {
+        GDKRPC_GA_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
+    });
     let details = read_json(loaded_tx);
     info!("loaded tx with memo: {:?}", details);
     assert_eq!(details["memo"].as_str().unwrap(), "hello world");
@@ -574,42 +573,6 @@ fn test_networks() {
 }
 
 #[test]
-fn test_mnemonic() {
-    let sess = setup();
-
-    let mut mnemonic: *const c_char = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_generate_mnemonic(&mut mnemonic) });
-    let mnemonic = read_str(mnemonic);
-    info!("generated mnemonic: {}", mnemonic);
-
-    let mnemonic_c = CString::new(mnemonic.clone()).unwrap();
-    let mut is_valid = 0;
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_validate_mnemonic(mnemonic_c.as_ptr(), &mut is_valid) });
-    info!("mnemonic is valid: {}", is_valid);
-    assert_eq!(GA_TRUE, is_valid);
-
-    let mnemonic_c = CString::new(mnemonic + "invalid").unwrap();
-    let mut is_valid = 0;
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_validate_mnemonic(mnemonic_c.as_ptr(), &mut is_valid) });
-    info!("invalid mnemonic is valid: {}", is_valid);
-    assert_eq!(GA_FALSE, is_valid);
-
-    teardown(sess);
-}
-
-#[test]
-fn test_destroy_string() {
-    let sess = setup();
-
-    let mut mnemonic: *const c_char = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_generate_mnemonic(&mut mnemonic) });
-
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_destroy_string(mnemonic) });
-
-    teardown(sess);
-}
-
-#[test]
 fn test_persist_wallet() {
     //! We're gonna login and request a new receive address twice in
     //! different sessions with the same account (mnemonic) and make sure
@@ -618,8 +581,7 @@ fn test_persist_wallet() {
 
     // Some variables that we reuse.
     let entropy: [u8; 32] = rand::random();
-    let mut mnemonic_ptr: *const c_char = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_generate_mnemonic(&mut mnemonic_ptr) });
+    let mut mnemonic_ptr = generate_mnemonic();
     let mnemonic = read_str(mnemonic_ptr);
     let mnemonic_c = CString::new(mnemonic.to_string()).unwrap();
     let hw_device = make_json(json!({ "type": "trezor" }));
@@ -662,25 +624,58 @@ extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
     info!("notification handler called: {:?} -- {:?}", read_json(ctx), read_json(data));
 }
 
+mod wally {
+    use libc::{c_char, c_int, c_uchar, c_void};
+    #[allow(non_camel_case_types)]
+    type size_t = usize;
+
+    pub const WALLY_OK: libc::c_int = 0;
+    extern "C" {
+        //WALLY_CORE_API int bip39_mnemonic_from_bytes(
+        //    const struct words *w,
+        //    const unsigned char *bytes,
+        //    size_t bytes_len,
+        //    char **output);
+        pub fn bip39_mnemonic_from_bytes(
+            word_list: *const c_void,
+            bytes: *const c_uchar,
+            bytes_len: size_t,
+            output: *mut *const c_char,
+        ) -> c_int;
+    }
+}
+
+fn generate_mnemonic() -> *const c_char {
+    let entropy: [u8; 32] = rand::random();
+
+    let mut out = ptr::null();
+    let ret = unsafe {
+        wally::bip39_mnemonic_from_bytes(ptr::null(), entropy.as_ptr(), entropy.len(), &mut out)
+    };
+    assert_eq!(ret, wally::WALLY_OK);
+    out
+}
+
+#[repr(C)]
+pub struct GA_json_upstream(Value);
+
 fn read_json(json: *const GA_json) -> Value {
-    let mut s: *const c_char = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_convert_json_to_string(json, &mut s) });
-    let s = unsafe { CStr::from_ptr(s) }.to_str().unwrap();
-    unsafe { GDKRPC_GA_destroy_json(json) };
-    serde_json::from_str(&s).unwrap()
+    let json_upstream: *const GA_json_upstream = unsafe { mem::transmute(json) };
+    unsafe { &*json_upstream }.0.clone()
 }
 
 fn make_json(val: Value) -> *const GA_json {
-    let cstr = CString::new(val.to_string()).unwrap();
-    let mut json: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_GA_convert_string_to_json(cstr.as_ptr(), &mut json) });
-    json
+    unsafe { mem::transmute(Box::new(GA_json_upstream(val))) }
 }
 
 fn get_status(auth_handler: *const GA_auth_handler) -> Value {
     let mut status: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_GA_auth_handler_get_status(auth_handler, &mut status) });
     read_json(status)
+}
+
+fn make_str<'a, S: Into<Cow<'a, str>>>(data: S) -> *const c_char {
+    CString::new(data.into().into_owned()).unwrap().into_raw()
 }
 
 fn read_str(s: *const c_char) -> String {
