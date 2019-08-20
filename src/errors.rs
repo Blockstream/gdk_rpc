@@ -2,9 +2,12 @@ use core::fmt;
 use std::borrow::Cow;
 use std::io;
 
+use backtrace::Backtrace;
 use bitcoin::consensus::encode;
 use bitcoin::util::bip32;
 use bitcoincore_rpc;
+#[cfg(feature = "liquid")]
+use elements;
 use failure;
 use hex;
 use secp256k1;
@@ -29,12 +32,21 @@ pub enum Error {
     WalletAlreadyRegistered,
     /// Mnemonics should be phrases of 24 words.
     InvalidMnemonic,
+    /// A user requested creation of a transaction with no recipients.
+    NoRecipients,
+    /// The wallet does not have any available UTXOs to fund a transaction.
+    NoUtxosFound,
+    /// Some of the data stored in the node is corrupt. The wallet will
+    /// probably have to be reset.
+    CorruptNodeData,
 
     // And then all other errors that we can't convert to GDK codes.
     Bip32(bip32::Error),
     Bip39(failure::Error),
     BitcoinEncode(encode::Error),
     BitcoinRpc(bitcoincore_rpc::Error),
+    #[cfg(feature = "liquid")]
+    ElementsAddress(elements::AddressError),
     Hashes(bitcoin_hashes::Error),
     Hex(hex::FromHexError),
     Io(io::Error),
@@ -50,14 +62,14 @@ impl Error {
     /// Convert the error to a GDK-compatible code.
     pub fn to_gdk_code(&self) -> &'static str {
         // Unhandles error codes:
-        // id_no_utxos_found
-        // id_no_recipients
         // id_no_amount_specified
         // id_fee_rate_is_below_minimum
         // id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
         match *self {
             Error::InsufficientFunds => "id_insufficient_funds",
+            Error::NoRecipients => "id_no_recipients",
+            Error::NoUtxosFound => "id_no_utxos_found",
             _ => GDK_ERROR_ID_UNKNOWN,
         }
     }
@@ -71,6 +83,7 @@ impl fmt::Display for Error {
 
 impl From<bitcoincore_rpc::Error> for Error {
     fn from(e: bitcoincore_rpc::Error) -> Error {
+        debug!("backtrace bitcoincore_rpc::Error: {} {:?}", e, Backtrace::new());
         match e {
             bitcoincore_rpc::Error::JsonRpc(ref e) => match e {
                 jsonrpc::Error::Rpc(ref e) => match e.code {
@@ -95,6 +108,7 @@ macro_rules! from_error {
     ($variant:ident, $err:ty) => {
         impl From<$err> for Error {
             fn from(e: $err) -> Error {
+                debug!("backtrace {}: {} {:?}", stringify!($err), e, Backtrace::new());
                 Error::$variant(e)
             }
         }
@@ -103,6 +117,8 @@ macro_rules! from_error {
 
 from_error!(Bip32, bip32::Error);
 from_error!(BitcoinEncode, encode::Error);
+#[cfg(feature = "liquid")]
+from_error!(ElementsAddress, elements::AddressError);
 from_error!(Hashes, bitcoin_hashes::Error);
 from_error!(Hex, hex::FromHexError);
 from_error!(Io, io::Error);
@@ -128,10 +144,16 @@ pub trait OptionExt<T> {
 
 impl<T> OptionExt<T> for Option<T> {
     fn or_err<E: Into<Cow<'static, str>>>(self, err: E) -> Result<T, Error> {
-        self.ok_or_else(|| Error::Other(err.into()))
+        self.ok_or_else(|| {
+            debug!("backtrace OptionExt::or_else: {:?}", Backtrace::new());
+            Error::Other(err.into())
+        })
     }
 
     fn req(self) -> Result<T, Error> {
-        self.ok_or_else(|| Error::Other("missing required option".into()))
+        self.ok_or_else(|| {
+            debug!("backtrace OptionExt::req: {:?}", Backtrace::new());
+            Error::Other("missing required option".into())
+        })
     }
 }

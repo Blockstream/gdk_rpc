@@ -180,6 +180,21 @@ extern "C" {
 // --test-threads=1
 
 static LOGGER: sync::Once = sync::Once::new();
+enum TestMode {
+    BitcoinRegtest,
+    ElementsRegtest,
+}
+lazy_static! {
+    static ref TEST_MODE: TestMode = match ::std::env::var("TEST_MODE") {
+        Ok(m) => match m.as_str() {
+            "bitcoinregtest" | "" => TestMode::BitcoinRegtest,
+            "elementsregtest" => TestMode::ElementsRegtest,
+            _ => panic!("invalid TEST_MODE value: {}", m),
+        },
+        Err(::std::env::VarError::NotPresent) => TestMode::BitcoinRegtest,
+        Err(e) => panic!("invalid TEST_MODE env var: {}", e),
+    };
+}
 
 /// The test setup function.
 fn setup_nologin() -> *mut GA_session {
@@ -193,7 +208,8 @@ fn setup_nologin() -> *mut GA_session {
     assert_eq!(GA_OK, unsafe { GA_create_session(&mut sess) });
 
     // connect
-    let network = CString::new("regtest-cookie").unwrap();
+    let network_str = env::var("GDK_RPC_NETWORK").unwrap_or("regtest-cookie".to_string());
+    let network = CString::new(network_str).unwrap();
     assert_eq!(GA_OK, unsafe { GA_connect(sess, network.as_ptr(), 5) });
     debug!("connected");
 
@@ -252,13 +268,12 @@ fn tick(sess: *mut GA_session) {
 }
 
 fn mine_blocks(n: u64) -> Vec<sha256d::Hash> {
-    let address = BITCOIND.get_new_address(None, None).unwrap();
-    BITCOIND.generate_to_address(n, &address).unwrap()
+    let address: String = BITCOIND.call("getnewaddress", &[]).unwrap();
+    BITCOIND.call("generatetoaddress", &[n.into(), address.into()]).unwrap()
 }
 
-fn send_coins(address: &bitcoin::Address, amount: f64) -> sha256d::Hash {
-    let txid =
-        BITCOIND.send_to_address(address, amount, None, None, None, None, None, None).unwrap();
+fn send_coins(address: &str, amount: f64) -> sha256d::Hash {
+    let txid = BITCOIND.call("sendtoaddress", &[address.into(), amount.into()]).unwrap();
     info!("send_coins(): Send {} BTC to {} in txid {}", amount, address, txid);
     txid
 }
@@ -393,7 +408,7 @@ fn test_balance() {
     let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
     let mut recv_addr: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_receive_address(sess, details, &mut recv_addr) });
-    let address = read_json(recv_addr)["address"].as_str().unwrap().parse().unwrap();
+    let address = read_json(recv_addr)["address"].as_str().unwrap().to_owned();
     debug!("Received coins to addr {} in txid {}", address, send_coins(&address, 50.0));
     mine_blocks(6);
 
@@ -442,18 +457,38 @@ fn send_tx() {
     let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
     let mut recv_addr: *const GA_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GA_get_receive_address(sess, details, &mut recv_addr) });
-    let address = read_json(recv_addr)["address"].as_str().unwrap().parse().unwrap();
+    let address = read_json(recv_addr)["address"].as_str().unwrap().to_owned();
     send_coins(&address, 500.0);
     mine_blocks(10);
 
-    let details = make_json(
-        // cTBHbKQuegSNeQuSurjy4mEGNm5ebW7Y8R9jYj11Lfc37PTej5ny -> mt9XjRweetsyCtc6HaXRohJSzvV9v796Ym
-        // cSNEZVDaawKzkZcmby8GrTwroE5EoNkSeH6XMxZfauzrpWJDkQ6p -> mnQUxaPB6hXKV8aGvShvuUDuXbPzhfVCy1
-        json!({ "addressees": [ {"address":"mt9XjRweetsyCtc6HaXRohJSzvV9v796Ym", "satoshi": 569000}, {"address":"bitcoin:mnQUxaPB6hXKV8aGvShvuUDuXbPzhfVCy1", "satoshi":1000} ] }),
-    );
-    let mut tx_detail_unsigned: *const GA_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_create_transaction(sess, details, &mut tx_detail_unsigned) });
-    info!("create_transaction: {:#?}\n", read_json(tx_detail_unsigned));
+    let addresses = match *TEST_MODE {
+        TestMode::BitcoinRegtest => {
+            ("mt9XjRweetsyCtc6HaXRohJSzvV9v796Ym", "mnQUxaPB6hXKV8aGvShvuUDuXbPzhfVCy1")
+        }
+        TestMode::ElementsRegtest => (
+            "2dtJFrDafpVJWFQnJRxcnrFPjuX83iF9gwg",
+            "Azpsob9eBh85ny2TKqHH3T69vmgMb9zMVh5ouk7ubwuduNFpAEXT9xY4zkgEsRuagCQi3NhY62fYAp3R",
+        ),
+    };
+    let details = make_json(json!({
+        "addressees": [
+            {
+                "address": addresses.0,
+                "satoshi": 569000
+            },
+            {
+                "address": format!("bitcoin:{}", addresses.1),
+                "satoshi":1000
+            }
+        ]
+    }));
+    let mut tx_detail_unsigned_ptr: *const GA_json = std::ptr::null_mut();
+    assert_eq!(GA_OK, unsafe { GA_create_transaction(sess, details, &mut tx_detail_unsigned_ptr) });
+    let tx_detail_unsigned = read_json(tx_detail_unsigned_ptr);
+    info!("create_transaction: {:#?}\n", tx_detail_unsigned);
+    let err = tx_detail_unsigned["error"].as_str().unwrap();
+    let err_msg = tx_detail_unsigned["error_msg"].as_str();
+    assert!(err.is_empty(), "create_transaction error: {} ({:?})", err, err_msg);
 
     // check balance
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
@@ -463,7 +498,9 @@ fn send_tx() {
     assert_eq!("500", balance);
 
     let mut auth_handler: *const GA_auth_handler = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GA_sign_transaction(sess, tx_detail_unsigned, &mut auth_handler) });
+    assert_eq!(GA_OK, unsafe {
+        GA_sign_transaction(sess, tx_detail_unsigned_ptr, &mut auth_handler)
+    });
     let sign_status = get_status(auth_handler);
     info!("sign_transaction status: {:#?}\n", sign_status);
 

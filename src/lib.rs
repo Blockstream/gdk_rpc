@@ -1,12 +1,11 @@
 #![recursion_limit = "128"]
 
+extern crate backtrace;
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate bitcoincore_rpc;
 extern crate chrono;
 extern crate dirs;
-#[cfg(feature = "liquid")]
-extern crate elements;
 extern crate jsonrpc;
 extern crate libc;
 extern crate rand;
@@ -27,6 +26,13 @@ extern crate android_log;
 extern crate stderrlog;
 extern crate url;
 
+// Liquid
+#[cfg(feature = "liquid")]
+extern crate elements;
+#[cfg(feature = "liquid")]
+extern crate liquid_rpc;
+
+pub mod coins;
 pub mod constants;
 #[macro_use]
 pub mod errors;
@@ -35,6 +41,8 @@ pub mod session;
 pub mod settings;
 pub mod util;
 pub mod wallet;
+
+// Liquid
 #[cfg(feature = "liquid")]
 pub mod wally;
 
@@ -240,7 +248,6 @@ pub extern "C" fn GA_register_user(
     mnemonic: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    println!("GA_register_user1()");
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);
@@ -397,7 +404,17 @@ pub extern "C" fn GA_create_transaction(
         Err(err) => {
             // errors are returned as a GA_OK with "error" in the returned object
             debug!("GA_create_transaction error: {:?}", err);
-            return ok_json!(ret, extend(res, json!({ "error": err.to_gdk_code() })).unwrap());
+            return ok_json!(
+                ret,
+                extend(
+                    res,
+                    json!({
+                        "error": err.to_gdk_code(),
+                        "error_msg": err.to_string(),
+                    })
+                )
+                .unwrap()
+            );
         }
         Ok(x) => x,
     };

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -56,4 +57,25 @@ pub fn extend(mut dest: Value, mut src: Value) -> Result<Value, Error> {
 
 pub fn fmt_time(unix_ts: u64) -> String {
     NaiveDateTime::from_timestamp(unix_ts as i64, 0).to_string()
+}
+
+pub fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
+    debug!("parse_addresses {:?}", details);
+
+    Ok(details["addressees"]
+        .as_array()
+        .req()?
+        .iter()
+        .map(|desc| {
+            let mut address = desc["address"].as_str().req()?;
+            let value = desc["satoshi"].as_u64().or_err("id_no_amount_specified")?;
+
+            if address.to_lowercase().starts_with("bitcoin:") {
+                address = address.split(":").nth(1).req()?;
+            }
+            // TODO: support BIP21 amount
+
+            Ok((address.to_string(), usat_to_fbtc(value)))
+        })
+        .collect::<Result<HashMap<String, f64>, Error>>()?)
 }

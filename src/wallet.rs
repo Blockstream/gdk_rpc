@@ -1,28 +1,36 @@
+//! The wallet module.
+//!
+//! Since this wallet implementation is supposed to work on top of both a
+//! Bitcoin Core node as an Elements or Liquid node, we avoid using the
+//! specialized bitcoincore-rpc and liquid-rpc client interfaces, but use
+//! general call methods so we can leverage the common parts of the raw
+//! responses. This might make the code a but harder to read or error-prone
+//! but it avoids having very big code duplication.
+//!
+
 use hex;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use std::{cell, fmt};
 
-use bitcoin::{
-    consensus::{deserialize, serialize},
-    util::bip143,
-    util::bip32,
-    Address, Network as BNetwork, Transaction,
-};
+use bitcoin::{util::bip32, Address, Network as BNetwork};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d;
-use bitcoincore_rpc::json as rpcjson;
-use bitcoincore_rpc::{Client as RpcClient, RpcApi};
+use bitcoincore_rpc::{json as rpcjson, Client as RpcClient, RpcApi};
 use serde_json::Value;
 
+#[cfg(feature = "liquid")]
+use elements;
+
+use crate::coins;
 use crate::constants::{SAT_PER_BIT, SAT_PER_BTC, SAT_PER_MBTC};
 use crate::errors::{Error, OptionExt};
 use crate::network::{Network, NetworkId};
-use crate::util::{btc_to_usat, extend, f64_from_val, fmt_time, usat_to_fbtc, SECP};
-use crate::wally;
+use crate::util::{btc_to_isat, btc_to_usat, extend, f64_from_val, fmt_time, SECP};
 
-type JsonMap = HashMap<String, Value>;
+#[cfg(feature = "liquid")]
+use crate::wally;
 
 const PER_PAGE: usize = 30;
 const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
@@ -43,7 +51,7 @@ const FEE_ESTIMATES_TTL: Duration = Duration::from_secs(240);
 /// serialized as JSON when stored in a label, so that new fields can easily
 /// be added.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
-struct AddressMeta {
+pub(crate) struct AddressMeta {
     /// The fingerprint of the extended private key used to derive the
     /// private key for this address.
     #[serde(rename = "fp", skip_serializing_if = "Option::is_none")]
@@ -60,10 +68,10 @@ struct AddressMeta {
 
 impl AddressMeta {
     /// Parse a label from Core.
-    pub fn from_label(l: Option<&String>) -> Result<AddressMeta, Error> {
+    pub fn from_label<S: AsRef<str>>(l: Option<S>) -> Result<AddressMeta, Error> {
         match l {
-            Some(s) if s.is_empty() => Ok(Default::default()),
-            Some(s) => Ok(serde_json::from_str(s)?),
+            Some(ref s) if s.as_ref().is_empty() => Ok(Default::default()),
+            Some(s) => Ok(serde_json::from_str(s.as_ref())?),
             None => Ok(Default::default()),
         }
     }
@@ -86,11 +94,18 @@ pub struct Wallet {
     network: &'static Network,
     rpc: RpcClient,
     mnemonic: String,
+
+    // For the BIP32 keys, the network variable should be ignored and not used.
+    /// The BIP32 master extended private key.
     master_xpriv: bip32::ExtendedPrivKey,
     /// The BIP32 extended private key for external addresses.
     external_xpriv: bip32::ExtendedPrivKey,
     /// The BIP32 extended private key for internal (i.e. change) addresses.
     internal_xpriv: bip32::ExtendedPrivKey,
+    /// The master blinding key.
+    #[cfg(feature = "liquid")]
+    master_blinding_key: [u8; 64],
+
     next_external_child: cell::Cell<bip32::ChildNumber>,
     next_internal_child: cell::Cell<bip32::ChildNumber>,
     tip: Option<sha256d::Hash>,
@@ -108,8 +123,16 @@ impl Wallet {
         let child_xpriv = master_xpriv.derive_priv(&SECP, &[child]).unwrap();
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
         match network {
-            NetworkId::Elements(..) => unimplemented!(), //TODO(stevenroose) implement
+            #[cfg(feature = "liquid")]
+            NetworkId::Elements(enet) => elements::Address::p2wpkh(
+                &child_xpub.public_key,
+                None,
+                coins::liq::address_params(enet),
+            )
+            .to_string(),
             NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
+            #[cfg(not(feature = "liquid"))]
+            _ => unimplemented!(),
         }
     }
 
@@ -131,11 +154,11 @@ impl Wallet {
         rpc: &bitcoincore_rpc::Client,
         state_addr: &str,
     ) -> Result<PersistentWalletState, Error> {
-        let info: JsonMap = rpc.call("getaddressinfo", &[state_addr.into()])?;
+        let info: Value = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
             None => return Err(Error::WalletNotRegistered),
-            Some(Value::String(label)) => {
-                Ok(match serde_json::from_str::<PersistentWalletState>(&label) {
+            Some(&Value::String(ref label)) => {
+                Ok(match serde_json::from_str::<PersistentWalletState>(label) {
                     Err(_) => panic!(
                         "corrupt persistent wallet state label (address: {}): {}",
                         state_addr, label
@@ -203,6 +226,8 @@ impl Wallet {
             master_xpriv: master_xpriv,
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
+            #[cfg(feature = "liquid")]
+            master_blinding_key: wally::asset_blinding_key_from_seed(&seed),
             next_external_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             next_internal_child: cell::Cell::new(bip32::ChildNumber::from_normal_idx(0).unwrap()),
             tip: None,
@@ -232,6 +257,8 @@ impl Wallet {
             master_xpriv: master_xpriv,
             external_xpriv: external_xpriv,
             internal_xpriv: internal_xpriv,
+            #[cfg(feature = "liquid")]
+            master_blinding_key: wally::asset_blinding_key_from_seed(&seed),
             next_external_child: cell::Cell::new(state.next_external_child),
             next_internal_child: cell::Cell::new(state.next_internal_child),
             tip: None,
@@ -253,14 +280,37 @@ impl Wallet {
         self.mnemonic.clone()
     }
 
+    fn derive_private_key(
+        &self,
+        fp: &bip32::Fingerprint,
+        child: &bip32::ChildNumber,
+    ) -> Result<secp256k1::SecretKey, Error> {
+        let xpriv = if *fp == self.external_xpriv.fingerprint(&SECP) {
+            self.external_xpriv
+        } else if *fp == self.internal_xpriv.fingerprint(&SECP) {
+            self.internal_xpriv
+        } else {
+            error!("Address is labeled with unknown master xpriv fingerprint: {:?}", fp);
+            return Err(Error::CorruptNodeData);
+        };
+        let privkey = xpriv.derive_priv(&SECP, &[*child])?.private_key;
+        Ok(privkey.key)
+    }
+
     pub fn updates(&mut self) -> Result<Vec<Value>, Error> {
         let mut msgs = vec![];
 
         // check for new blocks
         let tip = self.rpc.get_best_block_hash()?;
         if self.tip != Some(tip) {
-            let info = self.rpc.get_block_info(&tip)?;
-            msgs.push(json!({ "event": "block", "block": { "block_height": info.height, "block_hash": tip.to_hex() } }));
+            let info: Value = self.rpc.call("getblock", &[tip.to_hex().into(), 1.into()])?;
+            msgs.push(json!({
+                "event": "block",
+                "block": {
+                    "block_height": info["height"].as_u64().req()?,
+                    "block_hash": tip.to_hex()
+                }
+            }));
             self.tip = Some(tip);
         }
 
@@ -314,9 +364,15 @@ impl Wallet {
 
     fn _get_balance(&self, min_conf: u32) -> Result<Value, Error> {
         //TODO(stevenroose) implement in rust-bitcoincore-rpc once bitcoin::Amount lands
-        let balance: f64 =
-            self.rpc.call("getbalance", &[Value::Null, json!(min_conf), json!(true)])?;
+        let mut args = vec![Value::Null, json!(min_conf), json!(true)];
+        #[cfg(feature = "liquid")]
+        {
+            if let NetworkId::Elements(net) = self.network.id() {
+                args.push(coins::liq::asset_hex(net).into());
+            }
+        }
 
+        let balance: f64 = self.rpc.call("getbalance", &args)?;
         Ok(self._convert_satoshi(btc_to_usat(balance)))
     }
 
@@ -333,175 +389,97 @@ impl Wallet {
 
     fn _get_transactions(&self, limit: usize, start: usize) -> Result<(Vec<Value>, bool), Error> {
         // fetch listtranssactions
-        let txdescs = self.rpc.list_transactions(None, Some(limit), Some(start), Some(true))?;
+        let txdescs: Vec<Value> = self
+            .rpc
+            .call("listtransactions", &["*".into(), limit.into(), start.into(), true.into()])?;
         let potentially_has_more = txdescs.len() == limit;
 
         // fetch full transactions and convert to GDK format
-        let txs = txdescs
-            .into_iter()
-            .map(|desc| {
-                let txid = desc.info.txid;
-                let blockhash = desc.info.blockhash;
-                let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
+        let mut txs = Vec::new();
+        for desc in txdescs.into_iter() {
+            let txid = sha256d::Hash::from_hex(desc["txid"].as_str().req()?)?;
+            let blockhash = &desc["blockhash"];
+            let tx_hex: String = self.rpc.call(
+                "getrawtransaction",
+                &[txid.to_hex().into(), false.into(), blockhash.clone()],
+            )?;
 
-                format_gdk_tx(
-                    &tx,
-                    desc.detail.amount.into_inner(),
-                    desc.detail.fee.map(|a| a.into_inner()).unwrap_or(0),
-                    &desc.info,
-                    &[&desc.detail],
-                )
-            })
-            .collect::<Result<Vec<Value>, Error>>()?;
+            txs.push(format_gdk_tx(&desc, &hex::decode(&tx_hex)?, self.network.id())?);
+        }
         Ok((txs, potentially_has_more))
     }
 
     pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
         let txid = sha256d::Hash::from_hex(txid)?;
-        let desc = self.rpc.get_transaction(&txid, Some(true))?;
-        let blockhash = desc.info.blockhash;
-        let tx = self.rpc.get_raw_transaction(&txid, blockhash.as_ref())?;
-        format_gdk_tx(
-            &tx,
-            desc.amount.into_inner(),
-            desc.fee.unwrap().into_inner(),
-            &desc.info,
-            &desc.details.iter().collect::<Vec<&rpcjson::GetTransactionResultDetail>>(),
-        )
+        let desc: Value = self.rpc.call("gettransaction", &[txid.to_hex().into(), true.into()])?;
+        let raw_tx = hex::decode(desc["hex"].as_str().req()?)?;
+
+        format_gdk_tx(&desc, &raw_tx, self.network.id())
     }
 
     pub fn create_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("create_transaction(): {:?}", details);
 
-        let outs = parse_outs(&details)?;
-        debug!("create_transaction() addresses: {:?}", outs);
+        let unfunded_tx = match self.network.id() {
+            NetworkId::Bitcoin(..) => coins::btc::create_transaction(&self.rpc, details)?,
+            NetworkId::Elements(..) => coins::liq::create_transaction(&self.rpc, details)?,
+        };
+        debug!("create_transaction unfunded tx: {:?}", hex::encode(&unfunded_tx));
 
-        let unfunded_tx = self.rpc.create_raw_transaction_hex(&[], &outs, None, None)?;
-
-        debug!("create_transaction unfunded tx: {:?}", unfunded_tx);
-
-        // TODO explicit handling for id_no_utxos_found id_no_recipients id_insufficient_funds
-        // id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
+        // TODO explicit handling for id_no_amount_specified id_fee_rate_is_below_minimum id_invalid_replacement_fee_rate
         // id_send_all_requires_a_single_output
 
-        Ok(unfunded_tx)
+        Ok(hex::encode(unfunded_tx))
     }
 
     pub fn sign_transaction(&self, details: &Value) -> Result<String, Error> {
         debug!("sign_transaction(): {:?}", details);
         let change_address = self.next_address(&self.internal_xpriv, &self.next_internal_child)?;
 
-        // check listunspent
-        debug!("list_unspent: {:?}", self.rpc.list_unspent(Some(0), None, None, None, None)?);
-
-        //TODO(stevenroose) liquid
-        let fund_opts = bitcoincore_rpc::json::FundRawTransactionOptions {
-            change_address: Some(change_address.parse().unwrap()),
-            include_watching: Some(true),
-            ..Default::default()
-        };
-        debug!("hex: {}", details["hex"].as_str().unwrap());
-
-        // We start a loop because we need to retry when we find unusable inputs.
-        'outer: loop {
-            let funded_result = self.rpc.fund_raw_transaction(
-                details["hex"].as_str().unwrap(),
-                Some(&fund_opts),
-                None,
-            )?;
-            debug!("funded_tx raw: {:?}", hex::encode(&funded_result.hex));
-            let mut unsigned_tx: Transaction = deserialize(&funded_result.hex)?;
-
-            // Gather the details for the inputs.
-            let mut input_details = Vec::with_capacity(unsigned_tx.input.len());
-            for input in &unsigned_tx.input {
-                let prevout = input.previous_output;
-                let prevtx = self.rpc.get_transaction(&prevout.txid, Some(true))?;
-                let details = match prevtx.details.into_iter().find(|d| d.vout == prevout.vout) {
-                    None => throw!("transaction has unknown input: {}", prevout),
-                    Some(det) => det,
-                };
-
-                // If the output is not p2wpkh, we can't spend it for now.
-                //TODO(stevenroose) implement non-p2wpkh spending
-                //TODO(stevenroose) make this check better after https://github.com/rust-bitcoin/rust-bitcoin/pull/255
-                let is_p2wpkh = match details.address.payload {
-                    bitcoin::util::address::Payload::WitnessProgram(ref prog) => {
-                        prog.program().len() == 20
-                    }
-                    _ => false,
-                };
-                if !is_p2wpkh {
-                    warn!(
-                        "Wallet received a tx on a non-p2wpkh address {}: {}",
-                        details.address, prevout
-                    );
-                    // We lock the unspent so it doesn't get selected anymore.
-                    self.rpc.lock_unspent(&[prevout])?;
-                    continue 'outer;
-                }
-
-                input_details.push(details);
-            }
-            debug!("unsigned_tx: {:?}", unsigned_tx);
-
-            // Sign the tx.
-            let sighash_components = bip143::SighashComponents::new(&unsigned_tx);
-            for (idx, details) in input_details.into_iter().enumerate() {
-                let label = AddressMeta::from_label(details.label.as_ref())?;
-                if label.fingerprint.is_none() || label.child.is_none() {
-                    error!(
-                        "An address that is not ours is used for coin selection: {}",
-                        details.address
-                    );
-                }
-                let fp = label.fingerprint.unwrap();
-                let xpriv = if fp == self.external_xpriv.fingerprint(&SECP) {
-                    self.external_xpriv
-                } else if fp == self.internal_xpriv.fingerprint(&SECP) {
-                    self.internal_xpriv
-                } else {
-                    throw!(
-                        "address is labeled with unknown master xpriv fingerprint: {:?}",
-                        label.fingerprint
-                    )
-                };
-                let privkey = xpriv.derive_priv(&SECP, &[label.child.unwrap()])?.private_key;
-                let pubkey = privkey.public_key(&SECP);
-
-                let script_code = bitcoin::Address::p2pkh(&pubkey, privkey.network).script_pubkey();
-                let sighash = sighash_components.sighash_all(
-                    &unsigned_tx.input[idx],
-                    &script_code,
-                    details.amount.into_inner() as u64,
-                );
-                let msg = secp256k1::Message::from_slice(&sighash[..])?;
-                let mut signature = SECP.sign(&msg, &privkey.key).serialize_der();
-                signature.push(0x01);
-                unsigned_tx.input[idx].witness = vec![signature, pubkey.to_bytes()];
-            }
-
-            //TODO(stevenroose) remove when confident in signing code
-            let accept = self.rpc.test_mempool_accept(&[&unsigned_tx])?.into_iter().next().unwrap();
-            if accept.allowed == false {
-                error!(
-                    "sign_transaction(): signed tx is not valid: {}",
-                    accept.reject_reason.unwrap()
-                );
-                // TODO(stevenroose) should we return an error??
-            }
-
-            return Ok(hex::encode(&serialize(&unsigned_tx)));
+        // If we don't have any inputs, we can fail early.
+        let unspent: Vec<Value> = self.rpc.call("listunspent", &[0.into()])?;
+        if unspent.is_empty() {
+            return Err(Error::NoUtxosFound);
         }
+        debug!("list_unspent: {:?}", unspent);
+
+        let raw_tx = match self.network.id() {
+            NetworkId::Bitcoin(_) => {
+                coins::btc::sign_transaction(&self.rpc, details, &change_address, |fp, child| {
+                    self.derive_private_key(fp, child)
+                })?
+            }
+            NetworkId::Elements(net) => coins::liq::sign_transaction(
+                &self.rpc,
+                net,
+                details,
+                &change_address,
+                |fp, child| self.derive_private_key(fp, child),
+            )?,
+        };
+        let hex_tx = hex::encode(&raw_tx);
+
+        //TODO(stevenroose) remove when confident in signing code
+        let ret: Vec<Value> = self.rpc.call("testmempoolaccept", &[vec![hex_tx.clone()].into()])?;
+        let accept = ret.into_iter().next().unwrap();
+        if accept["allowed"].as_bool().req()? == false {
+            error!(
+                "sign_transaction(): signed tx is not valid: {}",
+                accept["reject-reason"].as_str().req()?
+            );
+            // TODO(stevenroose) should we return an error??
+        }
+
+        Ok(hex_tx)
     }
 
     pub fn send_transaction(&self, details: &Value) -> Result<String, Error> {
         let tx_hex = details["hex"].as_str().req()?;
-        Ok(self.rpc.send_raw_transaction(tx_hex)?.to_string())
+        Ok(self.rpc.call::<String>("sendrawtransaction", &[tx_hex.into()])?)
     }
 
     pub fn send_raw_transaction(&self, tx_hex: &str) -> Result<String, Error> {
-        Ok(self.rpc.send_raw_transaction(tx_hex)?.to_string())
+        Ok(self.rpc.call::<String>("sendrawtransaction", &[tx_hex.into()])?)
     }
 
     /// Return the next address for the derivation and import it in Core.
@@ -513,27 +491,39 @@ impl Wallet {
         let child_xpriv = xpriv.derive_priv(&SECP, &[child.get()])?;
         let child_xpub = bip32::ExtendedPubKey::from_private(&SECP, &child_xpriv);
 
-        let address_str = match self.network.id() {
-            NetworkId::Elements(..) => unimplemented!(), //TODO(stevenroose) implement
-            NetworkId::Bitcoin(bnet) => {
-                let address = Address::p2wpkh(&child_xpub.public_key, bnet);
-
-                // Tell the node to watch the new address.
-                // Since this is a newly generated address, rescanning is not required.
-                let meta = AddressMeta {
-                    fingerprint: Some(xpriv.fingerprint(&SECP)),
-                    child: Some(child.get()),
-                    ..Default::default()
-                };
-                // Full usafe of address labels explained on [AddressMeta].
-                self.rpc.import_public_key(
-                    &child_xpub.public_key,
-                    Some(&meta.to_label()?),
-                    Some(false),
-                )?;
-                address.to_string()
-            }
+        let meta = AddressMeta {
+            fingerprint: Some(xpriv.fingerprint(&SECP)),
+            child: Some(child.get()),
+            ..Default::default()
         };
+
+        let address_str = match self.network.id() {
+            #[cfg(feature = "liquid")]
+            NetworkId::Elements(enet) => {
+                let mut addr = elements::Address::p2shwpkh(
+                    &child_xpub.public_key,
+                    None,
+                    coins::liq::address_params(enet),
+                );
+                let blinding_key = wally::asset_blinding_key_to_ec_private_key(
+                    &self.master_blinding_key,
+                    &addr.script_pubkey(),
+                );
+                let blinding_pubkey = secp256k1::PublicKey::from_secret_key(&SECP, &blinding_key);
+                addr.blinding_pubkey = Some(blinding_pubkey);
+
+                // Store blinding privkey in the node.
+                let addr_str = addr.to_string();
+                coins::liq::store_blinding_key(&self.rpc, &addr_str, &blinding_key)?;
+                addr_str
+            }
+            NetworkId::Bitcoin(bnet) => Address::p2wpkh(&child_xpub.public_key, bnet).to_string(),
+            #[cfg(not(feature = "liquid"))]
+            _ => unimplemented!(),
+        };
+
+        // Since this is a newly generated address, rescanning is not required.
+        self.rpc.import_public_key(&child_xpub.public_key, Some(&meta.to_label()?), Some(false))?;
 
         child.set(match child.get() {
             bip32::ChildNumber::Normal {
@@ -623,8 +613,10 @@ impl Wallet {
         // we can't really set a tx memo, so we fake it by setting a memo on the address
         let txid = sha256d::Hash::from_hex(txid)?;
 
-        let txdesc = self.rpc.get_transaction(&txid, Some(true))?;
-        if txdesc.details.is_empty() {
+        let txdesc: Value =
+            self.rpc.call("gettransaction", &[txid.to_hex().into(), true.into()])?;
+        let details = txdesc["details"].as_array().req()?;
+        if details.is_empty() {
             throw!("Tx info for {} does not contain any details", txid);
         }
 
@@ -633,13 +625,13 @@ impl Wallet {
         // efficiently find it back later. We explicitly tag this label with
         // the txid of this tx, so that if an address gets assigned multiple
         // transaction memos, they won't conflict.
-        let detail = &txdesc.details[0];
-        let mut label = AddressMeta::from_label(detail.label.as_ref())?;
+        let detail = &details[0];
+        let mut label = AddressMeta::from_label(detail["label"].as_str())?;
         label.txmemo.insert(txid, memo.to_owned());
 
-        debug!("set_tx_memo() for {}, memo={}, address={}", txid, memo, detail.address);
+        debug!("set_tx_memo() for {}, memo={}, address={}", txid, memo, detail["address"]);
 
-        self.rpc.set_label(&detail.address, &label.to_label()?)?;
+        self.rpc.call("setlabel", &[detail["address"].clone(), label.to_label()?.into()])?;
         Ok(())
     }
 
@@ -672,73 +664,82 @@ impl fmt::Debug for Wallet {
     }
 }
 
-fn format_gdk_tx(
-    tx: &Transaction,
-    amount: i64,
-    fee: i64,
-    info: &rpcjson::WalletTxInfo,
-    details: &[&rpcjson::GetTransactionResultDetail],
-) -> Result<Value, Error> {
-    let txid = tx.txid();
-    let rawtx = serialize(tx);
-    let weight = tx.get_weight();
-    let vsize = (weight as f32 / 4.0) as u32;
+/// Finds a transction memo inside the transaction description field.
+/// This method can be provided with a response from either
+/// `gettransaction` or `listtransactions`.
+/// It returns "" if none if found.
+fn find_memo_in_desc(txid: sha256d::Hash, txdesc: &Value) -> Result<String, Error> {
+    // First we try the top-level label field from listtransactions.
+    if let Some(label) = txdesc["label"].as_str() {
+        let meta = AddressMeta::from_label(Some(label))?;
+        if let Some(memo) = meta.txmemo.get(&txid) {
+            return Ok(memo.to_owned());
+        }
+    }
 
-    let type_str = if amount > 0 {
-        "incoming"
-    } else {
-        "outgoing"
+    // Then we iterate over the details array.
+    if let Some(details) = txdesc["details"].as_array() {
+        for detail in details {
+            let meta = AddressMeta::from_label(detail["label"].as_str())?;
+            if let Some(memo) = meta.txmemo.get(&txid) {
+                return Ok(memo.to_owned());
+            }
+        }
+    }
+
+    Ok(String::new())
+}
+
+fn format_gdk_tx(txdesc: &Value, raw_tx: &[u8], network: NetworkId) -> Result<Value, Error> {
+    let txid = sha256d::Hash::from_hex(txdesc["txid"].as_str().req()?)?;
+    //TODO(stevenroose) optimize with Amount
+    let amount = match network {
+        NetworkId::Elements(..) => btc_to_isat(match txdesc["amount"] {
+            serde_json::Value::Object(ref v) => v["bitcoin"].as_f64().req()?,
+            ref v => v.as_f64().req()?,
+        }),
+        NetworkId::Bitcoin(..) => btc_to_isat(txdesc["amount"].as_f64().req()?),
+    };
+    let fee = txdesc["fee"].as_f64().map_or(0, |f| btc_to_usat(f * -1.0));
+
+    let type_str = match txdesc["category"].as_str() {
+        // for listtransactions, read out the category field
+        Some(category) => match category {
+            "send" => "outgoing",
+            "receive" => "incoming",
+            "immature" => "incoming",
+            _ => throw!("invalid tx category"),
+        },
+        // gettransaction doesn't have a top-level category,
+        // figure it out from the amount instead.
+        None => {
+            if amount > 0 {
+                "incoming"
+            } else {
+                "outgoing"
+            }
+        }
     };
 
-    //// read out from the "label" field if available,
-    //// or fallback to concating the labels for all the "details" items together
-    //let memo = txdesc["label"]
-    //    .as_str()
-    //    .map(|l| l.to_string())
-    //    .or_else(|| {
-    //        txdesc["details"].as_array().map(|ds| {
-    //            ds.iter()
-    //                .filter_map(|d| d["label"].as_str())
-    //                .collect::<Vec<&str>>()
-    //                .join(", ")
-    //        })
-    //    })
-    //    .unwrap_or("".to_string());
-    let memo = details.iter().find_map(|d| {
-        let label = match AddressMeta::from_label(d.label.as_ref()) {
-            Ok(l) => l,
-            Err(e) => {
-                error!(
-                    "Address {} has invalid label `{}`: {}",
-                    d.address,
-                    d.label.as_ref().unwrap(),
-                    e,
-                );
-                Default::default()
-            }
-        };
-        label.txmemo.get(&txid).cloned()
-    });
+    let tx_props = match network {
+        NetworkId::Bitcoin(_) => coins::btc::tx_props(&raw_tx)?,
+        NetworkId::Elements(_) => coins::liq::tx_props(&raw_tx)?,
+    };
+    let vsize = tx_props["transaction_vsize"].as_u64().unwrap();
 
-    Ok(json!({
-        "block_height": info.blockindex.map(|i| i as i32).unwrap_or(-1),
-        "created_at": fmt_time(info.time),
+    let ret = json!({
+        "block_height": 1,
+        "created_at": fmt_time(txdesc["time"].as_u64().req()?),
 
         "type": type_str,
-        "memo": memo.unwrap_or(String::new()),
+        "memo": find_memo_in_desc(txid, &txdesc)?,
 
-        "txhash": tx.txid().to_hex(),
-        "transaction": hex::encode(&rawtx),
+        "txhash": txid.to_hex(),
+        "transaction": hex::encode(&raw_tx),
 
         "satoshi": amount,
 
-        "transaction_version": tx.version,
-        "transaction_locktime": tx.lock_time,
-        "transaction_size": rawtx.len(),
-        "transaction_vsize": vsize,
-        "transaction_weight": weight,
-
-        "rbf_optin": info.bip125_replaceable == rpcjson::Bip125Replaceable::Yes,
+        "rbf_optin": txdesc["bip125-replaceable"].as_str().req()? == "yes",
         "cap_cpfp": false, // TODO
         "can_rbf": false, // TODO
         "has_payment_request": false, // TODO
@@ -755,26 +756,6 @@ fn format_gdk_tx(
         "addressees": [], // notice the extra "e" -- its intentional
         "inputs": [], // tx.input.iter().map(format_gdk_input).collect(),
         "outputs": [], //tx.output.iter().map(format_gdk_output).collect(),
-    }))
-}
-
-fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
-    debug!("parse_addresses {:?}", details);
-
-    Ok(details["addressees"]
-        .as_array()
-        .req()?
-        .iter()
-        .map(|desc| {
-            let mut address = desc["address"].as_str().req()?;
-            let value = desc["satoshi"].as_u64().or_err("id_no_amount_specified")?;
-
-            if address.to_lowercase().starts_with("bitcoin:") {
-                address = address.split(":").nth(1).req()?;
-            }
-            // TODO: support BIP21 amount
-
-            Ok((address.to_string(), usat_to_fbtc(value)))
-        })
-        .collect::<Result<HashMap<String, f64>, Error>>()?)
+    });
+    Ok(extend(ret, tx_props)?)
 }
