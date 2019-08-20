@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::Path;
-use std::{env, fs, mem, sync, ptr};
+use std::{env, fs, mem, ptr, sync};
 
 use bitcoin_hashes::sha256d;
 use bitcoincore_rpc::RpcApi;
