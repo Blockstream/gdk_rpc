@@ -119,123 +119,120 @@ where
     };
     debug!("hex: {}", details["hex"].as_str().unwrap());
 
-    // We start a loop because we need to retry when we find unusable inputs.
-    'outer: loop {
-        let funded_result = LiquidRpcApi::fund_raw_transaction(
+    let funded_result = LiquidRpcApi::fund_raw_transaction(
+        &rpc,
+        details["hex"].as_str().unwrap(),
+        Some(&fund_opts),
+        None,
+    )?;
+    debug!("unsigned tx raw: {:?}", hex::encode(&funded_result.hex));
+    let unsigned_tx: Transaction = deserialize(&funded_result.hex)?;
+
+    // Get the private keys needed to sign the tx.
+    let mut privkeys = Vec::with_capacity(unsigned_tx.input.len());
+    let mut amounts = Vec::with_capacity(unsigned_tx.input.len());
+    let mut amountcommitments = Vec::with_capacity(unsigned_tx.input.len());
+    let mut addresses = Vec::with_capacity(unsigned_tx.input.len());
+    let mut script_pubkeys = Vec::with_capacity(unsigned_tx.input.len());
+    let mut assets = Vec::with_capacity(unsigned_tx.input.len());
+    let mut amount_blinders = Vec::with_capacity(unsigned_tx.input.len());
+    let mut asset_blinders = Vec::with_capacity(unsigned_tx.input.len());
+    for input in &unsigned_tx.input {
+        let prevout = input.previous_output;
+        let prevtx = RpcApi::call::<Value>(
             &rpc,
-            details["hex"].as_str().unwrap(),
-            Some(&fund_opts),
-            None,
+            "gettransaction",
+            &[prevout.txid.to_string().into(), true.into()],
         )?;
-        debug!("unsigned tx raw: {:?}", hex::encode(&funded_result.hex));
-        let unsigned_tx: Transaction = deserialize(&funded_result.hex)?;
 
-        // Get the private keys needed to sign the tx.
-        let mut privkeys = Vec::with_capacity(unsigned_tx.input.len());
-        let mut amounts = Vec::with_capacity(unsigned_tx.input.len());
-        let mut amountcommitments = Vec::with_capacity(unsigned_tx.input.len());
-        let mut addresses = Vec::with_capacity(unsigned_tx.input.len());
-        let mut script_pubkeys = Vec::with_capacity(unsigned_tx.input.len());
-        let mut assets = Vec::with_capacity(unsigned_tx.input.len());
-        let mut amount_blinders = Vec::with_capacity(unsigned_tx.input.len());
-        let mut asset_blinders = Vec::with_capacity(unsigned_tx.input.len());
-        for input in &unsigned_tx.input {
-            let prevout = input.previous_output;
-            let prevtx = RpcApi::call::<Value>(
-                &rpc,
-                "gettransaction",
-                &[prevout.txid.to_string().into(), true.into()],
-            )?;
+        let mut details = prevtx.as_object().req()?["details"].as_array().req()?.into_iter();
+        let detail = match details.find(|d| d["vout"].as_u64() == Some(prevout.vout as u64)) {
+            None => throw!("transaction has unknown input: {}", prevout),
+            Some(det) => det,
+        };
+        let address = detail["address"].as_str().req()?;
+        let amount = detail["amount"].as_f64().or_err("own input with unknown amount")?;
+        let asset_hex = detail["asset"].as_str().req()?;
+        let label = detail["label"].as_str();
+        let amount_blinder_hex = detail["amountblinder"].as_str().req()?;
+        let asset_blinder_hex = detail["assetblinder"].as_str().req()?;
 
-            let mut details = prevtx.as_object().req()?["details"].as_array().req()?.into_iter();
-            let detail = match details.find(|d| d["vout"].as_u64() == Some(prevout.vout as u64)) {
-                None => throw!("transaction has unknown input: {}", prevout),
-                Some(det) => det,
-            };
-            let address = detail["address"].as_str().req()?;
-            let amount = detail["amount"].as_f64().or_err("own input with unknown amount")?;
-            let asset_hex = detail["asset"].as_str().req()?;
-            let label = detail["label"].as_str();
-            let amount_blinder_hex = detail["amountblinder"].as_str().req()?;
-            let asset_blinder_hex = detail["assetblinder"].as_str().req()?;
+        // Parse address and label.
+        let address: Address = address.parse()?;
+        let label = AddressMeta::from_label(label)?;
 
-            // Parse address and label.
-            let address: Address = address.parse()?;
-            let label = AddressMeta::from_label(label)?;
-
-            let prevtx_hex = hex::decode(prevtx["hex"].as_str().req()?)?;
-            let prevtx_tx: Transaction = deserialize(&prevtx_hex)?;
-            if !prevtx_tx.output[prevout.vout as usize].script_pubkey.is_p2sh()
-                || label.fingerprint.is_none()
-                || label.child.is_none()
-            {
-                throw!("An address that is not ours is used for coin selection: {}", address);
-            }
-
-            let sk = get_private_key(&label.fingerprint.unwrap(), &label.child.unwrap())?;
-            privkeys.push(bitcoin::PrivateKey {
-                key: sk,
-                compressed: true,
-                network: match network {
-                    ElementsNetwork::Liquid => bitcoin::Network::Bitcoin,
-                    ElementsNetwork::ElementsRegtest => bitcoin::Network::Regtest,
-                },
-            });
-            amounts.push(rpcjson::Amount::from_btc(amount));
-            let prevtx_hex = hex::decode(prevtx["hex"].as_str().req()?)?;
-            let prevtx_tx: Transaction = deserialize(&prevtx_hex)?;
-            amountcommitments.push(prevtx_tx.output[prevout.vout as usize].value);
-            addresses.push(address);
-            script_pubkeys.push(prevtx_tx.output[prevout.vout as usize].script_pubkey.clone());
-            assets.push(
-                AssetId::from_hex(&asset_hex)
-                    .map_err(|_| Error::Other("invalid asset id".into()))?,
-            );
-            amount_blinders.push(hex::decode(&amount_blinder_hex)?);
-            asset_blinders.push(hex::decode(&asset_blinder_hex)?);
+        let prevtx_hex = hex::decode(prevtx["hex"].as_str().req()?)?;
+        let prevtx_tx: Transaction = deserialize(&prevtx_hex)?;
+        if !prevtx_tx.output[prevout.vout as usize].script_pubkey.is_p2sh()
+            || label.fingerprint.is_none()
+            || label.child.is_none()
+        {
+            throw!("An address that is not ours is used for coin selection: {}", address);
         }
 
-        // Blind the tx.
-        let blinded_tx = LiquidRpcApi::raw_blind_raw_transaction(
-            &rpc,
-            &serialize(&unsigned_tx),
-            &amount_blinders,
-            &amounts,
-            &assets,
-            &asset_blinders,
-            Some(true), //TODO(stevenroose) set to false and catch error?
-        )?;
-        debug!("blinded tx raw: {}", hex::encode(&serialize(&blinded_tx)));
-
-        // Sign the tx.
-        let mut signed_tx = blinded_tx.clone(); // keep a totally unsigned copy
-        for idx in 0..blinded_tx.input.len() {
-            let privkey = privkeys[idx];
-            let pubkey = privkey.public_key(&SECP);
-
-            let script_code =
-                elements::Address::p2pkh(&pubkey, None, address_params(network)).script_pubkey();
-            let sighash = wally::tx_get_elements_signature_hash(
-                &blinded_tx,
-                idx,
-                &script_code,
-                &amountcommitments[idx],
-                bitcoin::SigHashType::All.as_u32(),
-                true, // segwit
-            );
-            let msg = secp256k1::Message::from_slice(&sighash[..])?;
-            let mut signature = SECP.sign(&msg, &privkey.key).serialize_der();
-            signature.push(0x01);
-            let redeem_script =
-                elements::Address::p2wpkh(&pubkey, None, address_params(network)).script_pubkey();
-            signed_tx.input[idx].script_sig = bitcoin::blockdata::script::Builder::new()
-                .push_slice(redeem_script.as_bytes())
-                .into_script();
-            signed_tx.input[idx].witness.script_witness = vec![signature, pubkey.to_bytes()];
-        }
-        let raw = serialize(&signed_tx);
-        debug!("signed tx raw: {}", hex::encode(&raw));
-
-        return Ok(raw);
+        let sk = get_private_key(&label.fingerprint.unwrap(), &label.child.unwrap())?;
+        privkeys.push(bitcoin::PrivateKey {
+            key: sk,
+            compressed: true,
+            network: match network {
+                ElementsNetwork::Liquid => bitcoin::Network::Bitcoin,
+                ElementsNetwork::ElementsRegtest => bitcoin::Network::Regtest,
+            },
+        });
+        amounts.push(rpcjson::Amount::from_btc(amount));
+        let prevtx_hex = hex::decode(prevtx["hex"].as_str().req()?)?;
+        let prevtx_tx: Transaction = deserialize(&prevtx_hex)?;
+        amountcommitments.push(prevtx_tx.output[prevout.vout as usize].value);
+        addresses.push(address);
+        script_pubkeys.push(prevtx_tx.output[prevout.vout as usize].script_pubkey.clone());
+        assets.push(
+            AssetId::from_hex(&asset_hex)
+                .map_err(|_| Error::Other("invalid asset id".into()))?,
+        );
+        amount_blinders.push(hex::decode(&amount_blinder_hex)?);
+        asset_blinders.push(hex::decode(&asset_blinder_hex)?);
     }
+
+    // Blind the tx.
+    let blinded_tx = LiquidRpcApi::raw_blind_raw_transaction(
+        &rpc,
+        &serialize(&unsigned_tx),
+        &amount_blinders,
+        &amounts,
+        &assets,
+        &asset_blinders,
+        Some(true), //TODO(stevenroose) set to false and catch error?
+    )?;
+    debug!("blinded tx raw: {}", hex::encode(&serialize(&blinded_tx)));
+
+    // Sign the tx.
+    let mut signed_tx = blinded_tx.clone(); // keep a totally unsigned copy
+    for idx in 0..blinded_tx.input.len() {
+        let privkey = privkeys[idx];
+        let pubkey = privkey.public_key(&SECP);
+
+        let script_code =
+            elements::Address::p2pkh(&pubkey, None, address_params(network)).script_pubkey();
+        let sighash = wally::tx_get_elements_signature_hash(
+            &blinded_tx,
+            idx,
+            &script_code,
+            &amountcommitments[idx],
+            bitcoin::SigHashType::All.as_u32(),
+            true, // segwit
+        );
+        let msg = secp256k1::Message::from_slice(&sighash[..])?;
+        let mut signature = SECP.sign(&msg, &privkey.key).serialize_der();
+        signature.push(0x01);
+        let redeem_script =
+            elements::Address::p2wpkh(&pubkey, None, address_params(network)).script_pubkey();
+        signed_tx.input[idx].script_sig = bitcoin::blockdata::script::Builder::new()
+            .push_slice(redeem_script.as_bytes())
+            .into_script();
+        signed_tx.input[idx].witness.script_witness = vec![signature, pubkey.to_bytes()];
+    }
+    let raw = serialize(&signed_tx);
+    debug!("signed tx raw: {}", hex::encode(&raw));
+
+    return Ok(raw);
 }
