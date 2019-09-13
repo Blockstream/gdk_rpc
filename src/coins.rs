@@ -15,6 +15,7 @@ fn no_support(coin: &'static str) {
 
 #[cfg(not(feature = "liquid"))]
 pub mod liq {
+    use bitcoin::util::bip32;
     use bitcoincore_rpc::Client as RpcClient;
     use serde_json::Value;
 
@@ -23,11 +24,13 @@ pub mod liq {
     use crate::network::ElementsNetwork;
 
     pub fn tx_props(raw_tx: &[u8]) -> Result<Value, Error> {
-        no_support("liquid")
+        no_support("liquid");
+        Err(Error::Other("impossible".into()))
     }
 
     pub fn create_transaction(_: &RpcClient, _: &Value) -> Result<Vec<u8>, Error> {
-        no_support("liquid")
+        no_support("liquid");
+        Err(Error::Other("impossible".into()))
     }
 
     pub fn sign_transaction<G>(
@@ -40,6 +43,7 @@ pub mod liq {
     where
         G: Fn(&bip32::Fingerprint, &bip32::ChildNumber) -> Result<secp256k1::SecretKey, Error>,
     {
-        no_support("liquid")
+        no_support("liquid");
+        Err(Error::Other("impossible".into()))
     }
 }

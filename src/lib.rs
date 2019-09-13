@@ -41,9 +41,6 @@ pub mod session;
 pub mod settings;
 pub mod util;
 pub mod wallet;
-
-// Liquid
-#[cfg(feature = "liquid")]
 pub mod wally;
 
 use serde_json::{from_value, Value};
