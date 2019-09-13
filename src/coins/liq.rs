@@ -233,5 +233,5 @@ where
     let raw = serialize(&signed_tx);
     debug!("signed tx raw: {}", hex::encode(&raw));
 
-    return Ok(raw);
+    Ok(raw)
 }

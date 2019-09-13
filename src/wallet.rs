@@ -155,7 +155,7 @@ impl Wallet {
     ) -> Result<PersistentWalletState, Error> {
         let info: Value = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
-            None => return Err(Error::WalletNotRegistered),
+            None => Err(Error::WalletNotRegistered),
             Some(&Value::String(ref label)) => {
                 Ok(match serde_json::from_str::<PersistentWalletState>(label) {
                     Err(_) => panic!(
