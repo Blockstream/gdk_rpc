@@ -85,10 +85,6 @@ pub enum GA_auth_handler {
 }
 
 impl GA_auth_handler {
-    fn error(err: String) -> *const GA_auth_handler {
-        let handler = GA_auth_handler::Error(err);
-        unsafe { transmute(Box::new(handler)) }
-    }
     fn done(res: Value) -> *const GA_auth_handler {
         debug!("GA_auth_handler::done() {:?}", res);
         let handler = GA_auth_handler::Done(res);
