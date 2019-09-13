@@ -4,6 +4,12 @@ variables:
   GDK_LOCATION: "/gdk"
   GDK_TARGET: "build-clang"
 
+test_gdk_rpc_no_liquid:
+  script:
+    - cd $CI_PROJECT_DIR
+    - ./build_deps.sh
+    - source /root/.cargo/env && cargo fmt --all -- --check && cargo check --all && cargo clippy --all && cargo build --no-default-features --all --release && ./test.sh
+
 test_gdk_rpc_rust_c:
   script:
     - cd $CI_PROJECT_DIR
