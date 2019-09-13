@@ -14,7 +14,7 @@ use secp256k1;
 use serde_json;
 use url;
 
-pub const GDK_ERROR_ID_UNKNOWN: &'static str = "id_unknown";
+pub const GDK_ERROR_ID_UNKNOWN: &str = "id_unknown";
 
 const CORE_INSUFFICIENT_FUNDS: i32 = -1;
 const CORE_WALLET_GENERIC: i32 = -4;
