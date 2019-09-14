@@ -84,20 +84,16 @@ impl fmt::Display for Error {
 impl From<bitcoincore_rpc::Error> for Error {
     fn from(e: bitcoincore_rpc::Error) -> Error {
         debug!("backtrace bitcoincore_rpc::Error: {} {:?}", e, Backtrace::new());
-        match e {
-            bitcoincore_rpc::Error::JsonRpc(ref e) => match e {
-                jsonrpc::Error::Rpc(ref e) => match e.code {
-                    CORE_INSUFFICIENT_FUNDS => return Error::InsufficientFunds,
-                    CORE_WALLET_GENERIC => {
-                        if e.message.contains("Duplicate -wallet filename specified.") {
-                            return Error::AlreadyLoggedIn;
-                        }
+        if let bitcoincore_rpc::Error::JsonRpc(jsonrpc::Error::Rpc(ref e)) = e {
+            match e.code {
+                CORE_INSUFFICIENT_FUNDS => return Error::InsufficientFunds,
+                CORE_WALLET_GENERIC => {
+                    if e.message.contains("Duplicate -wallet filename specified.") {
+                        return Error::AlreadyLoggedIn;
                     }
-                    _ => {}
-                },
+                }
                 _ => {}
-            },
-            _ => {}
+            }
         }
 
         Error::BitcoinRpc(e)
