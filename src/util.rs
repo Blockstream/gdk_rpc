@@ -71,7 +71,7 @@ pub fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
             let value = desc["satoshi"].as_u64().or_err("id_no_amount_specified")?;
 
             if address.to_lowercase().starts_with("bitcoin:") {
-                address = address.split(":").nth(1).req()?;
+                address = address.split(':').nth(1).req()?;
             }
             // TODO: support BIP21 amount
 

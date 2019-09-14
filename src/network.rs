@@ -195,6 +195,6 @@ impl Network {
 
 fn read_cookie(path: &str) -> Result<(String, String), Error> {
     let contents = fs::read_to_string(path)?;
-    let parts: Vec<&str> = contents.split(":").collect();
+    let parts: Vec<&str> = contents.split(':').collect();
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
