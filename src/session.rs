@@ -70,6 +70,8 @@ pub struct SessionManager {
 }
 unsafe impl Send for SessionManager {}
 
+// TODO: figure out why clippy is complaining here
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl SessionManager {
     pub fn new() -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(SessionManager {
