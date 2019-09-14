@@ -408,7 +408,7 @@ impl Wallet {
         Ok((txs, potentially_has_more))
     }
 
-    pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
+    pub fn get_transaction(&self, txid: &str) -> Result<Value, Error> {
         let txid = sha256d::Hash::from_hex(txid)?;
         let desc: Value = self.rpc.call("gettransaction", &[txid.to_hex().into(), true.into()])?;
         let raw_tx = hex::decode(desc["hex"].as_str().req()?)?;
@@ -608,7 +608,7 @@ impl Wallet {
         Ok(self._convert_satoshi(satoshi))
     }
 
-    pub fn set_tx_memo(&self, txid: &String, memo: &str) -> Result<(), Error> {
+    pub fn set_tx_memo(&self, txid: &str, memo: &str) -> Result<(), Error> {
         // we can't really set a tx memo, so we fake it by setting a memo on the address
         let txid = sha256d::Hash::from_hex(txid)?;
 
