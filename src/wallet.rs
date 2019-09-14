@@ -571,7 +571,6 @@ impl Wallet {
         let minrelayfee = json!(btc_to_usat(mempoolinfo["minrelaytxfee"].as_f64().req()? / 1000.0));
 
         let mut estimates: Vec<Value> = (2u16..25u16)
-            .into_iter()
             .map(|target| {
                 let est: rpcjson::EstimateSmartFeeResult =
                     self.rpc.call("estimatesmartfee", &[json!(target)])?;
