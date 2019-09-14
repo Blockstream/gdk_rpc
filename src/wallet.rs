@@ -282,18 +282,18 @@ impl Wallet {
 
     fn derive_private_key(
         &self,
-        fp: &bip32::Fingerprint,
-        child: &bip32::ChildNumber,
+        fp: bip32::Fingerprint,
+        child: bip32::ChildNumber,
     ) -> Result<secp256k1::SecretKey, Error> {
-        let xpriv = if *fp == self.external_xpriv.fingerprint(&SECP) {
+        let xpriv = if fp == self.external_xpriv.fingerprint(&SECP) {
             self.external_xpriv
-        } else if *fp == self.internal_xpriv.fingerprint(&SECP) {
+        } else if fp == self.internal_xpriv.fingerprint(&SECP) {
             self.internal_xpriv
         } else {
             error!("Address is labeled with unknown master xpriv fingerprint: {:?}", fp);
             return Err(Error::CorruptNodeData);
         };
-        let privkey = xpriv.derive_priv(&SECP, &[*child])?.private_key;
+        let privkey = xpriv.derive_priv(&SECP, &[child])?.private_key;
         Ok(privkey.key)
     }
 
@@ -446,7 +446,7 @@ impl Wallet {
         let raw_tx = match self.network.id() {
             NetworkId::Bitcoin(_) => {
                 coins::btc::sign_transaction(&self.rpc, details, &change_address, |fp, child| {
-                    self.derive_private_key(fp, child)
+                    self.derive_private_key(*fp, *child)
                 })?
             }
             NetworkId::Elements(net) => coins::liq::sign_transaction(
@@ -454,7 +454,7 @@ impl Wallet {
                 net,
                 details,
                 &change_address,
-                |fp, child| self.derive_private_key(fp, child),
+                |fp, child| self.derive_private_key(*fp, *child),
             )?,
         };
         let hex_tx = hex::encode(&raw_tx);
