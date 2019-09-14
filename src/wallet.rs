@@ -149,6 +149,7 @@ impl Wallet {
     }
 
     /// Load the persistent wallet state from the node.
+    #[allow(clippy::match_wild_err_arm)]
     fn load_persistent_state(
         rpc: &bitcoincore_rpc::Client,
         state_addr: &str,
