@@ -145,7 +145,7 @@ where
             &[prevout.txid.to_string().into(), true.into()],
         )?;
 
-        let mut details = prevtx.as_object().req()?["details"].as_array().req()?.into_iter();
+        let mut details = prevtx.as_object().req()?["details"].as_array().req()?.iter();
         let detail = match details.find(|d| d["vout"].as_u64() == Some(prevout.vout as u64)) {
             None => throw!("transaction has unknown input: {}", prevout),
             Some(det) => det,
