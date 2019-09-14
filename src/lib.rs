@@ -264,7 +264,7 @@ pub extern "C" fn GDKRPC_GA_login(
     let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);
 
-    if read_str(password).len() > 0 {
+    if !read_str(password).is_empty() {
         warn!("password-encrypted mnemonics are unsupported");
         return GA_ERROR;
     }
