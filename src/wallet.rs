@@ -462,7 +462,7 @@ impl Wallet {
         //TODO(stevenroose) remove when confident in signing code
         let ret: Vec<Value> = self.rpc.call("testmempoolaccept", &[vec![hex_tx.clone()].into()])?;
         let accept = ret.into_iter().next().unwrap();
-        if accept["allowed"].as_bool().req()? == false {
+        if !(accept["allowed"].as_bool().req()?) {
             error!(
                 "sign_transaction(): signed tx is not valid: {}",
                 accept["reject-reason"].as_str().req()?
