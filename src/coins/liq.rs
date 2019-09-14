@@ -186,8 +186,7 @@ where
         addresses.push(address);
         script_pubkeys.push(prevtx_tx.output[prevout.vout as usize].script_pubkey.clone());
         assets.push(
-            AssetId::from_hex(&asset_hex)
-                .map_err(|_| Error::Other("invalid asset id".into()))?,
+            AssetId::from_hex(&asset_hex).map_err(|_| Error::Other("invalid asset id".into()))?,
         );
         amount_blinders.push(hex::decode(&amount_blinder_hex)?);
         asset_blinders.push(hex::decode(&asset_blinder_hex)?);
