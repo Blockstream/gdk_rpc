@@ -3,6 +3,7 @@ image: blockstream/gdk_rpc@sha256:e0ca2d21faa0cc1a932d8b4d771da7118f73346391cbb2
 variables:
   GDK_LOCATION: "/gdk"
   GDK_TARGET: "build-clang"
+  GIT_SUBMODULE_STRATEGY: recursive
 
 test_gdk_rpc_no_liquid:
   script:
