@@ -220,6 +220,8 @@ pub fn bip39_mnemonic_to_seed(
 
 /// Calculate the signature hash for a specific index of
 /// an Elements transaction.
+
+#[cfg(feature = "liquid")]
 pub fn tx_get_elements_signature_hash(
     tx: &elements::Transaction,
     index: usize,
