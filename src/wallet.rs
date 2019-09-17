@@ -7,6 +7,7 @@
 //! responses. This might make the code a but harder to read or error-prone
 //! but it avoids having very big code duplication.
 //!
+#![allow(clippy::redundant_field_names)]
 
 use hex;
 use std::collections::HashMap;
