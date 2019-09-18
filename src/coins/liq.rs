@@ -145,8 +145,8 @@ where
             &[prevout.txid.to_string().into(), true.into()],
         )?;
 
-        let mut details = prevtx.as_object().req()?["details"].as_array().req()?.into_iter();
-        let detail = match details.find(|d| d["vout"].as_u64() == Some(prevout.vout as u64)) {
+        let mut details = prevtx.as_object().req()?["details"].as_array().req()?.iter();
+        let detail = match details.find(|d| d["vout"].as_u64() == Some(u64::from(prevout.vout))) {
             None => throw!("transaction has unknown input: {}", prevout),
             Some(det) => det,
         };
@@ -233,5 +233,5 @@ where
     let raw = serialize(&signed_tx);
     debug!("signed tx raw: {}", hex::encode(&raw));
 
-    return Ok(raw);
+    Ok(raw)
 }

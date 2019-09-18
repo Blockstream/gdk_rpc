@@ -230,9 +230,10 @@ pub fn tx_get_elements_signature_hash(
     sighash: u32,
     segwit: bool,
 ) -> sha256d::Hash {
-    let flags = match segwit {
-        false => 0,
-        true => ffi::WALLY_TX_FLAG_USE_WITNESS,
+    let flags = if segwit {
+        ffi::WALLY_TX_FLAG_USE_WITNESS
+    } else {
+        0
     };
 
     let tx_bytes = serialize(tx);

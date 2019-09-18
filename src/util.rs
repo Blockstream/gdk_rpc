@@ -18,6 +18,7 @@ pub fn make_str<'a, S: Into<Cow<'a, str>>>(data: S) -> *const c_char {
     CString::new(data.into().into_owned()).unwrap().into_raw()
 }
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn read_str(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().unwrap().to_string()
 }
@@ -71,7 +72,7 @@ pub fn parse_outs(details: &Value) -> Result<HashMap<String, f64>, Error> {
             let value = desc["satoshi"].as_u64().or_err("id_no_amount_specified")?;
 
             if address.to_lowercase().starts_with("bitcoin:") {
-                address = address.split(":").nth(1).req()?;
+                address = address.split(':').nth(1).req()?;
             }
             // TODO: support BIP21 amount
 

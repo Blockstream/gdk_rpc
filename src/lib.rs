@@ -1,4 +1,5 @@
 #![recursion_limit = "128"]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 extern crate backtrace;
 extern crate bitcoin;
@@ -85,10 +86,6 @@ pub enum GA_auth_handler {
 }
 
 impl GA_auth_handler {
-    fn error(err: String) -> *const GA_auth_handler {
-        let handler = GA_auth_handler::Error(err);
-        unsafe { transmute(Box::new(handler)) }
-    }
     fn done(res: Value) -> *const GA_auth_handler {
         debug!("GA_auth_handler::done() {:?}", res);
         let handler = GA_auth_handler::Done(res);
@@ -267,7 +264,7 @@ pub extern "C" fn GDKRPC_GA_login(
     let sess = sm.get_mut(sess).unwrap();
     let mnemonic = read_str(mnemonic);
 
-    if read_str(password).len() > 0 {
+    if !read_str(password).is_empty() {
         warn!("password-encrypted mnemonics are unsupported");
         return GA_ERROR;
     }

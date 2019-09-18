@@ -7,6 +7,7 @@
 //! responses. This might make the code a but harder to read or error-prone
 //! but it avoids having very big code duplication.
 //!
+#![allow(clippy::redundant_field_names)]
 
 use hex;
 use std::collections::HashMap;
@@ -149,13 +150,14 @@ impl Wallet {
     }
 
     /// Load the persistent wallet state from the node.
+    #[allow(clippy::match_wild_err_arm)]
     fn load_persistent_state(
         rpc: &bitcoincore_rpc::Client,
         state_addr: &str,
     ) -> Result<PersistentWalletState, Error> {
         let info: Value = rpc.call("getaddressinfo", &[state_addr.into()])?;
         match info.get("label") {
-            None => return Err(Error::WalletNotRegistered),
+            None => Err(Error::WalletNotRegistered),
             Some(&Value::String(ref label)) => {
                 Ok(match serde_json::from_str::<PersistentWalletState>(label) {
                     Err(_) => panic!(
@@ -281,18 +283,18 @@ impl Wallet {
 
     fn derive_private_key(
         &self,
-        fp: &bip32::Fingerprint,
-        child: &bip32::ChildNumber,
+        fp: bip32::Fingerprint,
+        child: bip32::ChildNumber,
     ) -> Result<secp256k1::SecretKey, Error> {
-        let xpriv = if *fp == self.external_xpriv.fingerprint(&SECP) {
+        let xpriv = if fp == self.external_xpriv.fingerprint(&SECP) {
             self.external_xpriv
-        } else if *fp == self.internal_xpriv.fingerprint(&SECP) {
+        } else if fp == self.internal_xpriv.fingerprint(&SECP) {
             self.internal_xpriv
         } else {
             error!("Address is labeled with unknown master xpriv fingerprint: {:?}", fp);
             return Err(Error::CorruptNodeData);
         };
-        let privkey = xpriv.derive_priv(&SECP, &[*child])?.private_key;
+        let privkey = xpriv.derive_priv(&SECP, &[child])?.private_key;
         Ok(privkey.key)
     }
 
@@ -408,7 +410,7 @@ impl Wallet {
         Ok((txs, potentially_has_more))
     }
 
-    pub fn get_transaction(&self, txid: &String) -> Result<Value, Error> {
+    pub fn get_transaction(&self, txid: &str) -> Result<Value, Error> {
         let txid = sha256d::Hash::from_hex(txid)?;
         let desc: Value = self.rpc.call("gettransaction", &[txid.to_hex().into(), true.into()])?;
         let raw_tx = hex::decode(desc["hex"].as_str().req()?)?;
@@ -445,7 +447,7 @@ impl Wallet {
         let raw_tx = match self.network.id() {
             NetworkId::Bitcoin(_) => {
                 coins::btc::sign_transaction(&self.rpc, details, &change_address, |fp, child| {
-                    self.derive_private_key(fp, child)
+                    self.derive_private_key(*fp, *child)
                 })?
             }
             NetworkId::Elements(net) => coins::liq::sign_transaction(
@@ -453,7 +455,7 @@ impl Wallet {
                 net,
                 details,
                 &change_address,
-                |fp, child| self.derive_private_key(fp, child),
+                |fp, child| self.derive_private_key(*fp, *child),
             )?,
         };
         let hex_tx = hex::encode(&raw_tx);
@@ -461,7 +463,7 @@ impl Wallet {
         //TODO(stevenroose) remove when confident in signing code
         let ret: Vec<Value> = self.rpc.call("testmempoolaccept", &[vec![hex_tx.clone()].into()])?;
         let accept = ret.into_iter().next().unwrap();
-        if accept["allowed"].as_bool().req()? == false {
+        if !(accept["allowed"].as_bool().req()?) {
             error!(
                 "sign_transaction(): signed tx is not valid: {}",
                 accept["reject-reason"].as_str().req()?
@@ -570,7 +572,6 @@ impl Wallet {
         let minrelayfee = json!(btc_to_usat(mempoolinfo["minrelaytxfee"].as_f64().req()? / 1000.0));
 
         let mut estimates: Vec<Value> = (2u16..25u16)
-            .into_iter()
             .map(|target| {
                 let est: rpcjson::EstimateSmartFeeResult =
                     self.rpc.call("estimatesmartfee", &[json!(target)])?;
@@ -608,7 +609,7 @@ impl Wallet {
         Ok(self._convert_satoshi(satoshi))
     }
 
-    pub fn set_tx_memo(&self, txid: &String, memo: &str) -> Result<(), Error> {
+    pub fn set_tx_memo(&self, txid: &str, memo: &str) -> Result<(), Error> {
         // we can't really set a tx memo, so we fake it by setting a memo on the address
         let txid = sha256d::Hash::from_hex(txid)?;
 
