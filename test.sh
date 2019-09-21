@@ -67,6 +67,8 @@ then
 fi
 RET=$?
 
+make tests/c-test && ./tests/c-test
+
 echo "Stopping daemon..."
 $CLI_CMD stop
 sleep 1
