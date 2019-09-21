@@ -96,14 +96,6 @@ GDK_API int GDKRPC_connect(struct GA_session* session, const GA_json* net_params
 GDK_API int GDKRPC_disconnect(struct GA_session* session);
 
 /**
- * Configure networking behaviour when reconnecting.
- *
- * :param session: The session to use.
- * :param hint: the :ref:`hint` to configure.
- */
-GDK_API int GDKRPC_reconnect_hint(struct GA_session* session, const GA_json* hint);
-
-/**
  * Check if server can be reached via the proxy.
  *
  * :param params: the :ref:`params-proxy` of the server to connect to.
@@ -444,30 +436,6 @@ GDK_API int GDKRPC_get_fee_estimates(struct GA_session* session, GA_json** estim
 GDK_API int GDKRPC_get_mnemonic_passphrase(struct GA_session* session, const char* password, char** mnemonic);
 
 /**
- * Get the latest un-acknowledged system message.
- *
- * :param session: The session to use.
- * :param message_text: The returned UTF-8 encoded message text.
- *|     Returned string should be freed using `GA_destroy_string`.
- *
- * .. note:: If all current messages are acknowledged, an empty string is returned.
- */
-GDK_API int GDKRPC_get_system_message(struct GA_session* session, char** message_text);
-
-/**
- * Sign and acknowledge a system message.
- *
- * The message text will be signed with a key derived from the wallet master key and the signature
- * sent to the server.
- *
- * :param session: The session to use.
- * :param message_text: UTF-8 encoded message text being acknowledged.
- * :param call: Destination for the resulting GA_auth_handler to acknowledge the message.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_ack_system_message(struct GA_session* session, const char* message_text, struct GA_auth_handler** call);
-
-/**
  * Get the two factor configuration for the current user.
  *
  * :param session: The session to use.
@@ -475,34 +443,6 @@ GDK_API int GDKRPC_ack_system_message(struct GA_session* session, const char* me
  *|     Returned GA_json should be freed using `GA_destroy_json`.
  */
 GDK_API int GDKRPC_get_twofactor_config(struct GA_session* session, GA_json** config);
-
-/**
- * Encrypt data.
- *
- * :param session: The session to use.
- * :param input: The data to encrypt.
- * :param output: Destination for the encrypted data.
- *|     Returned GA_json should be freed using `GA_destroy_json`.
- *
- * If no key is given, the data is encrypted using a key derived from the user's mnemonics.
- * This will fail to decrypt the data correctly if the user is logged in in watch-only
- * mode. For watch only users a key must be provided by the caller.
- *
- */
-GDK_API int GDKRPC_encrypt(struct GA_session* session, const GA_json* input, GA_json** output);
-
-/**
- * Decrypt data.
- *
- * :param session: The session to use.
- * :param input: The data to decrypt.
- * :param output: Destination for the decrypted data.
- *|     Returned GA_json should be freed using `GA_destroy_json`.
- *
- * See GA_encrypt.
- *
- */
-GDK_API int GDKRPC_decrypt(struct GA_session* session, const GA_json* input, GA_json** output);
 
 /**
  * Change settings
@@ -563,164 +503,14 @@ GDK_API int GDKRPC_convert_json_value_to_json(const GA_json* json, const char* p
  */
 GDK_API int GDKRPC_destroy_json(GA_json* json);
 
-#endif /* SWIG */
-
-/**
- * Get the status/result of an action requiring authorization.
- *
- * :param call: The auth_handler whose status is to be queried.
- * :param output: Destination for the resulting :ref:`twofactor-status`.
- *|     Returned GA_json should be freed using `GA_destroy_json`.
- *
- * Methods in the api that may require two factor or hardware authentication
- * to complete return a GA_auth_handler object. This object encapsulates the
- * process of determining whether authentication is required and handling
- * conditions such as re-prompting and re-trying after an incorrect two
- * factor code is entered.
- *
- * The object acts as a state machine which is stepped through by the caller
- * until the desired action is completed. At each step, the current state can
- * be determined and used to perform the next action required.
- *
- * Some actions require a sequence of codes and decisions; these are hidden
- * behind the state machine interface so that callers do not need to handle
- * special cases or program their own logic to handle any lower level API
- * differences.
- *
- * The state machine has the following states, which are returned in the
- * "status" element from GA_auth_handler_get_status():
- *
- * * "done": The action has been completed successfully. Any data returned
- *|  from the action is present in the "result" element of the status JSON.
- *
- * * "error": A non-recoverable error occurred performing the action. The
- *| associated error message is given in the status element "error". The
- *| auth_handler object should be destroyed and the action restarted from
- *| scratch if this state is returned.
- *
- * * "request_code": Two factor authorization is required. The caller should
- *| prompt the user to choose a two factor method from the "methods" element
- *| and call GA_auth_handler_request_code() with the selected method.
- *
- * * "resolve_code": The caller should prompt the user to enter the code from
- *| the twofactor method chosen in the "request_code" step, and pass this
- *| code to GA_auth_handler_resolve_code().
- *
- * * "call": Twofactor or hardwre authorization is complete and the caller
- *| should call GA_auth_handler_call() to perform the action.
- *
- */
-GDK_API int GDKRPC_auth_handler_get_status(struct GA_auth_handler* call, GA_json** output);
-
-/**
- * Request a two factor authentication code to authorize an action.
- *
- * :param call: The auth_handler representing the action to perform.
- * :param method: The selected two factor method to use
- */
-GDK_API int GDKRPC_auth_handler_request_code(struct GA_auth_handler* call, const char* method);
-
-/**
- * Authorize an action by providing its previously requested two factor authentication code.
- *
- * :param call: The auth_handler representing the action to perform.
- * :param code: The two factor authentication code received by the user.
- */
-GDK_API int GDKRPC_auth_handler_resolve_code(struct GA_auth_handler* call, const char* code);
-
-/**
- * Perform an action following the completion of authorization.
- *
- * :param call: The auth_handler representing the action to perform.
- */
-GDK_API int GDKRPC_auth_handler_call(struct GA_auth_handler* call);
-
-/**
- * Free an auth_handler after use.
- *
- * :param call: The auth_handler to free.
- */
-GDK_API int GDKRPC_destroy_auth_handler(struct GA_auth_handler* call);
-
-/**
- * Enable or disable a two factor authentication method.
- *
- * :param session: The session to use
- * :param method: The two factor method to enable/disable, i.e. "email", "sms", "phone", "gauth"
- * :param twofactor_details: The two factor method and associated data such as an email address. :ref:`twofactor-detail`
- * :param call: Destination for the resulting GA_auth_handler to perform the action
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_change_settings_twofactor(
-    struct GA_session* session, const char* method, const GA_json* twofactor_details, struct GA_auth_handler** call);
-
-/**
- * Request to begin the two factor authentication reset process.
- *
- * :param session: The session to use.
- * :param email: The new email address to enable once the reset waiting period expires.
- * :param is_dispute: GA_TRUE if the reset request is disputed, GA_FALSE otherwise.
- * :param call: Destination for the resulting GA_auth_handler to request the reset.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_twofactor_reset(
-    struct GA_session* session, const char* email, uint32_t is_dispute, struct GA_auth_handler** call);
-
-/**
- * Cancel all outstanding two factor resets and unlock the wallet for normal operation.
- *
- * :param session: The session to use.
- * :param call: Destination for the resulting GA_auth_handler to cancel the reset.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_twofactor_cancel_reset(struct GA_session* session, struct GA_auth_handler** call);
-
-/**
- * Change twofactor limits settings.
- *
- * :param session: The session to use.
- * :param limit_details: Details of the new :ref:`transaction-limits`
- * :param call: Destination for the resulting GA_auth_handler to perform the change.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_twofactor_change_limits(
-    struct GA_session* session, const GA_json* limit_details, struct GA_auth_handler** call);
-
-#ifndef SWIG
 /**
  * Free a string returned by the api.
  *
  * :param str: The string to free.
  */
-GDK_API void GA_destroy_string(char* str);
+GDK_API void GDKRPC_destroy_string(char* str);
+
 #endif /* SWIG */
-
-/**
- * Get up to 32 random bytes.
- *
- * Generate up to 32 random bytes using the same strategy as Bitcoin Core code.
- *
- * :param output_bytes: bytes output buffer
- * :param siz: Number of bytes to return (max. 32)
- */
-GDK_API int GDKRPC_get_random_bytes(size_t num_bytes, unsigned char* output_bytes, size_t len);
-
-/**
- * Generate a new random BIP 39 mnemonic.
- *
- * :param output: The generated mnemonic phrase.
- *|     Returned string should be freed using `GA_destroy_string`.
- */
-GDK_API int GDKRPC_generate_mnemonic(char** output);
-
-/**
- * Validate a BIP 39 mnemonic.
- *
- * :param mnemonic: The mnemonic phrase
- * :param valid: Destination for the result: GA_TRUE if the mnemonic is valid else GA_FALSE
- */
-GDK_API int GDKRPC_validate_mnemonic(const char* mnemonic, uint32_t* valid);
-
 /**
  * Register a network configuration
  *
@@ -741,13 +531,6 @@ GDK_API int GDKRPC_register_network(const char* name, const GA_json* network_det
  *|     Returned GA_json should be freed using `GA_destroy_json`.
  */
 GDK_API int GDKRPC_get_networks(GA_json** output);
-
-/**
- * Get a uint32_t in the range 0 to (upper_bound - 1) without bias
- *
- * :param output: Destination for the generated uint32_t.
- */
-GDK_API int GDKRPC_get_uniform_uint32_t(uint32_t upper_bound, uint32_t* output);
 
 #ifdef __cplusplus
 } /* extern "C" */
