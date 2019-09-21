@@ -10,7 +10,7 @@ use crate::errors::Error;
 use crate::network::Network;
 use crate::settings::Settings;
 use crate::wallet::Wallet;
-use crate::GA_json;
+use crate::GDKRPC_json;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -18,7 +18,8 @@ pub struct GA_session {
     pub settings: Settings,
     pub network: Option<&'static Network>,
     pub wallet: Option<Wallet>,
-    pub notify: Option<(extern "C" fn(*const libc::c_void, *const GA_json), *const libc::c_void)>,
+    pub notify:
+        Option<(extern "C" fn(*const libc::c_void, *const GDKRPC_json), *const libc::c_void)>,
 }
 
 impl GA_session {
@@ -58,7 +59,7 @@ impl GA_session {
     pub fn notify(&self, data: Value) {
         debug!("push notification: {:?}", data);
         if let Some((handler, context)) = self.notify {
-            handler(context, GA_json::new(data));
+            handler(context, GDKRPC_json::new(data));
         } else {
             warn!("no registered handler to receive notification");
         }

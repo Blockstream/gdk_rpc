@@ -50,7 +50,10 @@ pub struct GA_auth_handler {
 #[link(name = "gdk_rpc")]
 extern "C" {
     fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32;
-    fn GDKRPC_get_available_currencies(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_available_currencies(
+        sess: *const GA_session,
+        ret: *mut *const GDKRPC_json,
+    ) -> i32;
     fn GDKRPC_get_fee_estimates(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_get_mnemonic_passphrase(
         sess: *const GA_session,
@@ -67,7 +70,11 @@ extern "C" {
     fn GDKRPC_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
 
     fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
-    fn GDKRPC_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_subaccount(
+        sess: *const GA_session,
+        index: u32,
+        ret: *mut *const GDKRPC_json,
+    ) -> i32;
 
     fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_change_settings(
@@ -170,7 +177,6 @@ extern "C" {
 
     fn GDKRPC_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
     fn GDKRPC_destroy_json(json: *const GDKRPC_json) -> i32;
-    fn GDKRPC_destroy_session(sess: *const GA_session) -> i32;
     fn GDKRPC_destroy_string(s: *const c_char) -> i32;
 
     // this method only exists for testing purposes
