@@ -46,6 +46,7 @@ pub mod wally;
 
 use serde_json::{from_value, Value};
 
+use std::ffi::CString;
 use std::mem::transmute;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
@@ -646,6 +647,92 @@ pub extern "C" fn GDKRPC_change_settings(
     sess.settings = tryit!(from_value(new_settings.clone()));
 
     ok!(ret, GA_auth_handler::success())
+}
+
+//
+// JSON utilities
+//
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_to_string(json: *const GDKRPC_json, ret: *mut *const c_char) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let res = json.to_string();
+    ok!(ret, make_str(res))
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_string_to_json(jstr: *const c_char, ret: *mut *const GDKRPC_json) -> i32 {
+    let jstr = read_str(jstr);
+    let json: Value = tryit!(serde_json::from_str(&jstr));
+    ok_json!(ret, json)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_string(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut *const c_char,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_str().req());
+    ok!(ret, make_str(res.to_string()))
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_uint32(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut u32,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_u64().req()) as u32;
+    ok!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_uint64(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut u64,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_u64().req());
+    ok!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_json(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut *const GDKRPC_json,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let jstr = tryit!(json[path].as_str().req());
+    let res: Value = tryit!(serde_json::from_str(jstr));
+    ok_json!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_destroy_json(ptr: *mut GDKRPC_json) -> i32 {
+    debug!("GA_destroy_json({:?})", ptr);
+    // TODO make sure this works
+    unsafe {
+        drop(&*ptr);
+    }
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_destroy_string(ptr: *mut c_char) -> i32 {
+    unsafe {
+        // retake pointer and drop
+        let _ = CString::from_raw(ptr);
+    }
+    GA_OK
 }
 
 //

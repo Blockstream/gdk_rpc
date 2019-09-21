@@ -33,7 +33,7 @@ const GA_TRUE: u32 = 1;
 const GA_FALSE: u32 = 0;
 
 #[repr(C)]
-pub struct GA_json {
+pub struct GDKRPC_json {
     _private: [u8; 0],
 }
 
@@ -49,9 +49,9 @@ pub struct GA_auth_handler {
 
 #[link(name = "gdk_rpc")]
 extern "C" {
-    fn GDKRPC_get_networks(ret: *mut *const GA_json) -> i32;
-    fn GDKRPC_get_available_currencies(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
-    fn GDKRPC_get_fee_estimates(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_available_currencies(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_fee_estimates(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_get_mnemonic_passphrase(
         sess: *const GA_session,
         password: *const c_char,
@@ -59,44 +59,44 @@ extern "C" {
     ) -> i32;
     fn GDKRPC_convert_amount(
         sess: *const GA_session,
-        details: *const GA_json,
-        ret: *mut *const GA_json,
+        details: *const GDKRPC_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_create_session(ret: *mut *mut GA_session) -> i32;
     fn GDKRPC_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
 
-    fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
-    fn GDKRPC_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GA_json) -> i32;
+    fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_subaccount(sess: *const GA_session, index: u32, ret: *mut *const GDKRPC_json) -> i32;
 
-    fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32;
+    fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_change_settings(
         sess: *const GA_session,
-        new_settings: *const GA_json,
+        new_settings: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
     fn GDKRPC_get_receive_address(
         sess: *const GA_session,
-        details: *const GA_json,
-        ret: *mut *const GA_json,
+        details: *const GDKRPC_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_get_balance(
         sess: *const GA_session,
-        details: *const GA_json,
-        ret: *mut *const GA_json,
+        details: *const GDKRPC_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_register_user(
         sess: *mut GA_session,
-        _hw_device: *const GA_json,
+        _hw_device: *const GDKRPC_json,
         mnemonic: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
     ) -> i32;
     fn GDKRPC_login(
         sess: *mut GA_session,
-        _hw_device: *const GA_json,
+        _hw_device: *const GDKRPC_json,
         mnemonic: *const c_char,
         password: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
@@ -104,31 +104,31 @@ extern "C" {
 
     fn GDKRPC_get_transactions(
         sess: *mut GA_session,
-        details: *const GA_json,
-        ret: *mut *const GA_json,
+        details: *const GDKRPC_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_get_transaction_details(
         sess: *mut GA_session,
         txid: *const c_char,
-        ret: *mut *const GA_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_create_transaction(
         sess: *const GA_session,
-        details: *const GA_json,
-        ret: *mut *const GA_json,
+        details: *const GDKRPC_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_sign_transaction(
         sess: *const GA_session,
-        details: *const GA_json,
+        details: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
     fn GDKRPC_send_transaction(
         sess: *const GA_session,
-        details: *const GA_json,
+        details: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
@@ -144,26 +144,34 @@ extern "C" {
         mnemonic: *const c_char,
         pin: *const c_char,
         device_id: *const c_char,
-        ret: *mut *const GA_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
     fn GDKRPC_login_with_pin(
         sess: *const GA_session,
         device_id: *const c_char,
-        pin_data: *const GA_json,
+        pin_data: *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_auth_handler_get_status(
         handler: *const GA_auth_handler,
-        ret: *mut *const GA_json,
+        ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_set_notification_handler(
         sess: *mut GA_session,
-        handler: extern "C" fn(*const GA_json, *const GA_json),
-        context: *const GA_json,
+        handler: extern "C" fn(*const GDKRPC_json, *const GDKRPC_json),
+        context: *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_destroy_session(sess: *const GA_session) -> i32;
+
+    fn GDKRPC_convert_json_to_string(json: *const GDKRPC_json, ret: *mut *const c_char) -> i32;
+    fn GDKRPC_convert_string_to_json(jstr: *const c_char, ret: *mut *const GDKRPC_json) -> i32;
+
+    fn GDKRPC_destroy_auth_handler(handler: *const GA_auth_handler) -> i32;
+    fn GDKRPC_destroy_json(json: *const GDKRPC_json) -> i32;
+    fn GDKRPC_destroy_session(sess: *const GA_session) -> i32;
+    fn GDKRPC_destroy_string(s: *const c_char) -> i32;
 
     // this method only exists for testing purposes
     fn GDKRPC_test_tick(sess: *mut GA_session) -> i32;
@@ -314,22 +322,22 @@ fn test_account() {
 fn test_currencies() {
     let sess = setup();
 
-    let mut currencies: *const GA_json = std::ptr::null_mut();
+    let mut currencies: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_available_currencies(sess, &mut currencies) });
     debug!("currencies: {:?}\n", read_json(currencies));
 
     let details = make_json(json!({ "satoshi": 1234567 }));
-    let mut units: *const GA_json = std::ptr::null_mut();
+    let mut units: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_convert_amount(sess, details, &mut units) });
     debug!("converted units from satoshi: {:?}\n", read_json(units));
 
     let details = make_json(json!({ "btc": 0.1 }));
-    let mut units: *const GA_json = std::ptr::null_mut();
+    let mut units: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_convert_amount(sess, details, &mut units) });
     debug!("converted units from btc: {:?}\n", read_json(units));
 
     let details = make_json(json!({ "fiat": 400 }));
-    let mut units: *const GA_json = std::ptr::null_mut();
+    let mut units: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_convert_amount(sess, details, &mut units) });
     debug!("converted units from fiat: {:?}\n", read_json(units));
 
@@ -340,7 +348,7 @@ fn test_currencies() {
 fn test_estimates() {
     let sess = setup();
 
-    let mut estimates: *const GA_json = std::ptr::null_mut();
+    let mut estimates: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_fee_estimates(sess, &mut estimates) });
     info!("fee estimates: {:?}\n", read_json(estimates));
 
@@ -351,7 +359,7 @@ fn test_estimates() {
 fn test_subaccount() {
     let sess = setup();
 
-    let mut subaccounts: *const GA_json = std::ptr::null_mut();
+    let mut subaccounts: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_subaccounts(sess, &mut subaccounts) });
     debug!("subaccounts: {:#?}\n", read_json(subaccounts));
 
@@ -363,7 +371,7 @@ fn test_transactions() {
     let sess = setup();
 
     let details = make_json(json!({ "page_id": 0 }));
-    let mut txs: *const GA_json = std::ptr::null_mut();
+    let mut txs: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_transactions(sess, details, &mut txs) });
     debug!("txs: {:#?}\n", read_json(txs));
 
@@ -375,7 +383,7 @@ fn test_get_address() {
     let sess = setup();
 
     let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
-    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    let mut recv_addr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_receive_address(sess, details, &mut recv_addr) });
     debug!("recv addr: {:#?}\n", read_json(recv_addr));
 
@@ -387,7 +395,7 @@ fn test_balance() {
     let sess = setup();
 
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
-    let mut balance: *const GA_json = std::ptr::null_mut();
+    let mut balance: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_balance(sess, details, &mut balance) });
     let balance_before = read_json(balance)["btc"].as_str().unwrap().to_owned();
     debug!("balance_before: {}\n", balance_before);
@@ -395,7 +403,7 @@ fn test_balance() {
 
     // receive some coins
     let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
-    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    let mut recv_addr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_receive_address(sess, details, &mut recv_addr) });
     let address = read_json(recv_addr)["address"].as_str().unwrap().to_owned();
     debug!("Received coins to addr {} in txid {}", address, send_coins(&address, 50.0));
@@ -403,7 +411,7 @@ fn test_balance() {
 
     // balance now
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
-    let mut balance: *const GA_json = std::ptr::null_mut();
+    let mut balance: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_balance(sess, details, &mut balance) });
     let balance_after = read_json(balance)["btc"].as_str().unwrap().to_owned();
     debug!("balance_after: {}\n", balance_after);
@@ -416,7 +424,7 @@ fn test_balance() {
 fn test_settings() {
     let sess = setup();
 
-    let mut settings: *const GA_json = std::ptr::null_mut();
+    let mut settings: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_settings(sess, &mut settings) });
     let mut settings = read_json(settings);
     debug!("get settings: {:#?}\n", settings);
@@ -429,7 +437,7 @@ fn test_settings() {
     assert_eq!(GA_OK, unsafe { GDKRPC_change_settings(sess, settings, &mut auth_handler) });
     debug!("change settings status: {:#?}\n", get_status(auth_handler));
 
-    let mut settings: *const GA_json = std::ptr::null_mut();
+    let mut settings: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_settings(sess, &mut settings) });
     let settings = read_json(settings);
     debug!("get settings again: {:#?}\n", settings);
@@ -444,7 +452,7 @@ fn send_tx() {
 
     // receive some coins first
     let details = make_json(json!({"subaccount": 0, "address_type": "csv"}));
-    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    let mut recv_addr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_receive_address(sess, details, &mut recv_addr) });
     let address = read_json(recv_addr)["address"].as_str().unwrap().to_owned();
     send_coins(&address, 500.0);
@@ -471,7 +479,7 @@ fn send_tx() {
             }
         ]
     }));
-    let mut tx_detail_unsigned_ptr: *const GA_json = std::ptr::null_mut();
+    let mut tx_detail_unsigned_ptr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GDKRPC_create_transaction(sess, details, &mut tx_detail_unsigned_ptr)
     });
@@ -483,7 +491,7 @@ fn send_tx() {
 
     // check balance
     let details = make_json(json!({ "subaccount": 0, "num_confs": 0 }));
-    let mut balance: *const GA_json = std::ptr::null_mut();
+    let mut balance: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_balance(sess, details, &mut balance) });
     let balance = read_json(balance)["btc"].as_str().unwrap().to_owned();
     assert_eq!("500", balance);
@@ -505,7 +513,7 @@ fn send_tx() {
 
     let txid = CString::new(status.pointer("/result/txid").unwrap().as_str().unwrap()).unwrap();
 
-    let mut loaded_tx: *const GA_json = std::ptr::null_mut();
+    let mut loaded_tx: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GDKRPC_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
     });
@@ -520,7 +528,7 @@ fn send_tx() {
     });
     debug!("set memo");
 
-    let mut loaded_tx: *const GA_json = std::ptr::null_mut();
+    let mut loaded_tx: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GDKRPC_get_transaction_details(sess, txid.as_ptr(), &mut loaded_tx)
     });
@@ -540,7 +548,7 @@ fn test_pin() {
     let mnemonic = CString::new(mnemonic).unwrap();
     let pin = CString::new("1234").unwrap();
     let device_id = CString::new("foo").unwrap();
-    let mut pin_data: *const GA_json = std::ptr::null_mut();
+    let mut pin_data: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe {
         GDKRPC_set_pin(sess, mnemonic.as_ptr(), pin.as_ptr(), device_id.as_ptr(), &mut pin_data)
     });
@@ -558,7 +566,7 @@ fn test_pin() {
 fn test_networks() {
     let sess = setup();
 
-    let mut nets: *const GA_json = std::ptr::null_mut();
+    let mut nets: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_networks(&mut nets) });
     debug!("networks: {:?}\n", read_json(nets));
 
@@ -591,7 +599,7 @@ fn test_persist_wallet() {
         GDKRPC_login(sess, hw_device, mnemonic_c.as_ptr(), password.as_ptr(), &mut auth_handler)
     });
 
-    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    let mut recv_addr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_receive_address(sess, details, &mut recv_addr) });
     let first_addr = read_json(recv_addr);
 
@@ -603,7 +611,7 @@ fn test_persist_wallet() {
         GDKRPC_login(sess, hw_device, mnemonic_c.as_ptr(), password.as_ptr(), &mut auth_handler)
     });
 
-    let mut recv_addr: *const GA_json = std::ptr::null_mut();
+    let mut recv_addr: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_receive_address(sess, details, &mut recv_addr) });
     let second_addr = read_json(recv_addr);
 
@@ -613,7 +621,7 @@ fn test_persist_wallet() {
     teardown(sess);
 }
 
-extern "C" fn notification_handler(ctx: *const GA_json, data: *const GA_json) {
+extern "C" fn notification_handler(ctx: *const GDKRPC_json, data: *const GDKRPC_json) {
     info!("notification handler called: {:?} -- {:?}", read_json(ctx), read_json(data));
 }
 
@@ -650,19 +658,19 @@ fn generate_mnemonic() -> *const c_char {
 }
 
 #[repr(C)]
-pub struct GA_json_upstream(Value);
+pub struct GDKRPC_json_upstream(Value);
 
-fn read_json(json: *const GA_json) -> Value {
-    let json_upstream: *const GA_json_upstream = unsafe { mem::transmute(json) };
+fn read_json(json: *const GDKRPC_json) -> Value {
+    let json_upstream: *const GDKRPC_json_upstream = unsafe { mem::transmute(json) };
     unsafe { &*json_upstream }.0.clone()
 }
 
-fn make_json(val: Value) -> *const GA_json {
-    unsafe { mem::transmute(Box::new(GA_json_upstream(val))) }
+fn make_json(val: Value) -> *const GDKRPC_json {
+    unsafe { mem::transmute(Box::new(GDKRPC_json_upstream(val))) }
 }
 
 fn get_status(auth_handler: *const GA_auth_handler) -> Value {
-    let mut status: *const GA_json = std::ptr::null_mut();
+    let mut status: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_auth_handler_get_status(auth_handler, &mut status) });
     read_json(status)
 }
