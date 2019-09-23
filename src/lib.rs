@@ -166,15 +166,6 @@ pub extern "C" fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32 {
 #[cfg(feature = "android_logger")]
 static INIT_LOGGER: Once = ONCE_INIT;
 
-#[no_mangle]
-pub extern "C" fn GDKRPC_init(config: *const GDKRPC_json) -> i32 {
-    debug!("GA_init() config: {:?}", config);
-
-    #[cfg(feature = "android_logger")]
-    INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
-
-    GA_OK
-}
 
 #[no_mangle]
 pub extern "C" fn GDKRPC_create_session(ret: *mut *const GA_session) -> i32 {
