@@ -38,7 +38,7 @@ pub struct GDKRPC_json {
 }
 
 #[repr(C)]
-pub struct GA_session {
+pub struct GDKRPC_session {
     _private: [u8; 0],
 }
 
@@ -51,58 +51,58 @@ pub struct GA_auth_handler {
 extern "C" {
     fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_get_available_currencies(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
-    fn GDKRPC_get_fee_estimates(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_fee_estimates(sess: *const GDKRPC_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_get_mnemonic_passphrase(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         password: *const c_char,
         ret: *mut *const c_char,
     ) -> i32;
     fn GDKRPC_convert_amount(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
-    fn GDKRPC_create_session(ret: *mut *mut GA_session) -> i32;
-    fn GDKRPC_connect(sess: *mut GA_session, network: *const c_char, log_level: u32) -> i32;
+    fn GDKRPC_create_session(ret: *mut *mut GDKRPC_session) -> i32;
+    fn GDKRPC_connect(sess: *mut GDKRPC_session, network: *const c_char, log_level: u32) -> i32;
 
-    fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_subaccounts(sess: *const GDKRPC_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_get_subaccount(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         index: u32,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
-    fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const GDKRPC_json) -> i32;
+    fn GDKRPC_get_settings(sess: *const GDKRPC_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_change_settings(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         new_settings: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
     fn GDKRPC_get_receive_address(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_get_balance(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_register_user(
-        sess: *mut GA_session,
+        sess: *mut GDKRPC_session,
         _hw_device: *const GDKRPC_json,
         mnemonic: *const c_char,
         auth_handler: *mut *const GA_auth_handler,
     ) -> i32;
     fn GDKRPC_login(
-        sess: *mut GA_session,
+        sess: *mut GDKRPC_session,
         _hw_device: *const GDKRPC_json,
         mnemonic: *const c_char,
         password: *const c_char,
@@ -110,51 +110,51 @@ extern "C" {
     ) -> i32;
 
     fn GDKRPC_get_transactions(
-        sess: *mut GA_session,
+        sess: *mut GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_get_transaction_details(
-        sess: *mut GA_session,
+        sess: *mut GDKRPC_session,
         txid: *const c_char,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_create_transaction(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
 
     fn GDKRPC_sign_transaction(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
     fn GDKRPC_send_transaction(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         details: *const GDKRPC_json,
         ret: *mut *const GA_auth_handler,
     ) -> i32;
 
     fn GDKRPC_set_transaction_memo(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         txid: *const c_char,
         memo: *const c_char,
         memo_type: u32,
     ) -> i32;
 
     fn GDKRPC_set_pin(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         mnemonic: *const c_char,
         pin: *const c_char,
         device_id: *const c_char,
         ret: *mut *const GDKRPC_json,
     ) -> i32;
     fn GDKRPC_login_with_pin(
-        sess: *const GA_session,
+        sess: *const GDKRPC_session,
         device_id: *const c_char,
         pin_data: *const GDKRPC_json,
     ) -> i32;
@@ -165,12 +165,12 @@ extern "C" {
     ) -> i32;
 
     fn GDKRPC_set_notification_handler(
-        sess: *mut GA_session,
+        sess: *mut GDKRPC_session,
         handler: extern "C" fn(*const GDKRPC_json, *const GDKRPC_json),
         context: *const GDKRPC_json,
     ) -> i32;
 
-    fn GDKRPC_destroy_session(sess: *const GA_session) -> i32;
+    fn GDKRPC_destroy_session(sess: *const GDKRPC_session) -> i32;
 
     fn GDKRPC_convert_json_to_string(json: *const GDKRPC_json, ret: *mut *const c_char) -> i32;
     fn GDKRPC_convert_string_to_json(jstr: *const c_char, ret: *mut *const GDKRPC_json) -> i32;
@@ -180,7 +180,7 @@ extern "C" {
     fn GDKRPC_destroy_string(s: *const c_char) -> i32;
 
     // this method only exists for testing purposes
-    fn GDKRPC_test_tick(sess: *mut GA_session) -> i32;
+    fn GDKRPC_test_tick(sess: *mut GDKRPC_session) -> i32;
 }
 
 // TODO free up resources
@@ -204,14 +204,14 @@ lazy_static! {
 }
 
 /// The test setup function.
-fn setup_nologin() -> *mut GA_session {
+fn setup_nologin() -> *mut GDKRPC_session {
     LOGGER.call_once(|| {
         #[cfg(feature = "stderr_logger")]
         stderrlog::new().verbosity(3).init().unwrap();
     });
 
     // create new session
-    let mut sess: *mut GA_session = std::ptr::null_mut();
+    let mut sess: *mut GDKRPC_session = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_create_session(&mut sess) });
 
     // connect
@@ -224,7 +224,7 @@ fn setup_nologin() -> *mut GA_session {
 }
 
 /// Setup with login.
-fn setup() -> *mut GA_session {
+fn setup() -> *mut GDKRPC_session {
     let sess = setup_nologin();
 
     let hw_device = make_json(json!({ "type": "trezor" }));
@@ -245,7 +245,7 @@ fn setup() -> *mut GA_session {
 }
 
 /// The test teardown function.
-fn teardown(sess: *mut GA_session) {
+fn teardown(sess: *mut GDKRPC_session) {
     debug!("destroying session");
     assert_eq!(GA_OK, unsafe { GDKRPC_destroy_session(sess) })
 }
@@ -266,7 +266,7 @@ lazy_static! {
     };
 }
 
-fn tick(sess: *mut GA_session) {
+fn tick(sess: *mut GDKRPC_session) {
     assert_eq!(GA_OK, unsafe { GDKRPC_test_tick(sess) });
 }
 

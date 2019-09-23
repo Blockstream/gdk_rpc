@@ -14,7 +14,7 @@ use crate::GDKRPC_json;
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct GA_session {
+pub struct GDKRPC_session {
     pub settings: Settings,
     pub network: Option<&'static Network>,
     pub wallet: Option<Wallet>,
@@ -22,9 +22,9 @@ pub struct GA_session {
         Option<(extern "C" fn(*const libc::c_void, *const GDKRPC_json), *const libc::c_void)>,
 }
 
-impl GA_session {
-    fn new() -> *mut GA_session {
-        let sess = GA_session {
+impl GDKRPC_session {
+    fn new() -> *mut GDKRPC_session {
+        let sess = GDKRPC_session {
             settings: Settings::default(),
             network: None,
             wallet: None,
