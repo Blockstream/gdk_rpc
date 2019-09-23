@@ -28,15 +28,15 @@ matrix:
       script:
         - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && export GDK_TARGET=build-clang && ./build_deps.sh && ./test.sh"
 
-    - name: ndk armeabi-v7a
-      script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh armeabi-v7a"
-    - name: ndk arm64-v8a
-      script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh arm64-v8a"
-    - name: ndk x86_64
-      script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86_64"
-    - name: ndk x86
-      script:
-        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86"
+#    - name: ndk armeabi-v7a
+#      script:
+#        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh armeabi-v7a"
+#    - name: ndk arm64-v8a
+#      script:
+#        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh arm64-v8a"
+#    - name: ndk x86_64
+#      script:
+#        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86_64"
+#    - name: ndk x86
+#      script:
+#        - docker run -v $PWD:/gdk_rpc $DOCKERBUILDER@sha256:$DOCKERHASH /bin/bash -c "cd /gdk_rpc && export GDK_LOCATION=/gdk && ./ndk.sh x86"
