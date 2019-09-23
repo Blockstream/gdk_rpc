@@ -49,7 +49,6 @@ use serde_json::{from_value, Value};
 use std::ffi::CString;
 use std::mem::transmute;
 use std::os::raw::c_char;
-use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "android_logger")]
 use std::sync::{Once, ONCE_INIT};
@@ -57,17 +56,9 @@ use std::sync::{Once, ONCE_INIT};
 use crate::constants::{GA_ERROR, GA_MEMO_USER, GA_OK};
 use crate::errors::OptionExt;
 use crate::network::Network;
-use crate::session::{spawn_ticker, GDKRPC_session, SessionManager};
+use crate::session::GDKRPC_session;
 use crate::util::{extend, log_filter, make_str, read_str};
 use crate::wallet::Wallet;
-
-lazy_static! {
-    static ref SESS_MANAGER: Arc<Mutex<SessionManager>> = {
-        let sm = SessionManager::new();
-        spawn_ticker(Arc::clone(&sm));
-        sm
-    };
-}
 
 #[derive(Debug)]
 #[repr(C)]
@@ -144,6 +135,24 @@ macro_rules! ok_json {
     }};
 }
 
+macro_rules! safe_ref {
+    ($t:expr) => {{
+        if $t.is_null() {
+            return GA_ERROR;
+        }
+        unsafe { &*$t }
+    }};
+}
+
+macro_rules! safe_mut_ref {
+    ($t:expr) => {{
+        if $t.is_null() {
+            return GA_ERROR;
+        }
+        unsafe { &mut *$t }
+    }};
+}
+
 //
 // Networks
 //
@@ -166,7 +175,6 @@ pub extern "C" fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32 {
 #[cfg(feature = "android_logger")]
 static INIT_LOGGER: Once = ONCE_INIT;
 
-
 #[no_mangle]
 pub extern "C" fn GDKRPC_create_session(ret: *mut *const GDKRPC_session) -> i32 {
     debug!("GA_create_session()");
@@ -174,24 +182,19 @@ pub extern "C" fn GDKRPC_create_session(ret: *mut *const GDKRPC_session) -> i32 
     #[cfg(feature = "android_logger")]
     INIT_LOGGER.call_once(|| android_log::init("gdk_rpc").unwrap());
 
-    let mut sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.register();
+    let sess = GDKRPC_session::new();
 
     ok!(ret, sess)
 }
 
 #[no_mangle]
 pub extern "C" fn GDKRPC_destroy_session(sess: *mut GDKRPC_session) -> i32 {
-    let mut sm = SESS_MANAGER.lock().unwrap();
-    {
-        // Make sure the wallet is logged out.
-        let sess = sm.get_mut(sess).unwrap();
-        if let Some(wallet) = sess.wallet.take() {
-            tryit!(wallet.logout());
-        }
+    let sess = safe_mut_ref!(sess);
+
+    if let Some(wallet) = sess.wallet.take() {
+        tryit!(wallet.logout());
     }
 
-    tryit!(sm.remove(sess));
     GA_OK
 }
 
@@ -201,8 +204,7 @@ pub extern "C" fn GDKRPC_connect(
     network_name: *const c_char,
     log_level: u32,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
 
     log::set_max_level(log_filter(log_level));
 
@@ -216,8 +218,8 @@ pub extern "C" fn GDKRPC_connect(
 
 #[no_mangle]
 pub extern "C" fn GDKRPC_disconnect(sess: *mut GDKRPC_session) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
+
     sess.network = None;
     if let Some(wallet) = sess.wallet.take() {
         tryit!(wallet.logout());
@@ -233,11 +235,10 @@ pub extern "C" fn GDKRPC_register_user(
     mnemonic: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
     let mnemonic = read_str(mnemonic);
 
-    debug!("GA_register_user({}) {:?}", mnemonic, sess);
+    debug!("GA_register_user({:?}) {:?}", mnemonic, sess);
     let network = tryit!(sess.network.or_err("session not connected"));
     sess.wallet = Some(tryit!(Wallet::register(network, &mnemonic)));
 
@@ -252,8 +253,8 @@ pub extern "C" fn GDKRPC_login(
     password: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
+
     let mnemonic = read_str(mnemonic);
 
     if !read_str(password).is_empty() {
@@ -290,8 +291,8 @@ pub extern "C" fn GDKRPC_get_transactions(
     details: *const GDKRPC_json,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
+
     let details = &unsafe { &*details }.0;
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -308,8 +309,7 @@ pub extern "C" fn GDKRPC_get_transaction_details(
     txid: *const c_char,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let txid = read_str(txid);
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -324,8 +324,8 @@ pub extern "C" fn GDKRPC_get_balance(
     details: *const GDKRPC_json,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
+
     let details = &unsafe { &*details }.0;
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -341,13 +341,13 @@ pub extern "C" fn GDKRPC_set_transaction_memo(
     memo: *const c_char,
     memo_type: u32,
 ) -> i32 {
+    let sess = safe_ref!(sess);
+
     if memo_type != GA_MEMO_USER {
         warn!("unsupported memo type");
         return GA_ERROR;
     }
 
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
 
     let txid = read_str(txid);
@@ -368,8 +368,7 @@ pub extern "C" fn GDKRPC_create_transaction(
     details: *const GDKRPC_json,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let details = &unsafe { &*details }.0;
 
     debug!("GA_create_transaction() {:?}", details);
@@ -415,8 +414,7 @@ pub extern "C" fn GDKRPC_sign_transaction(
     tx_detail_unsigned: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let tx_detail_unsigned = &unsafe { &*tx_detail_unsigned }.0;
 
     debug!("GA_sign_transaction() {:?}", tx_detail_unsigned);
@@ -435,8 +433,7 @@ pub extern "C" fn GDKRPC_send_transaction(
     tx_detail_signed: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let tx_detail_signed = &unsafe { &*tx_detail_signed }.0;
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -451,8 +448,7 @@ pub extern "C" fn GDKRPC_broadcast_transaction(
     tx_hex: *const c_char,
     ret: *mut *const c_char,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let tx_hex = read_str(tx_hex);
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -471,8 +467,7 @@ pub extern "C" fn GDKRPC_get_receive_address(
     addr_details: *const GDKRPC_json,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let addr_details = &unsafe { &*addr_details }.0;
 
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
@@ -490,9 +485,7 @@ pub extern "C" fn GDKRPC_get_subaccounts(
     sess: *const GDKRPC_session,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
-
+    let sess = safe_ref!(sess);
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let account = tryit!(wallet.get_account(0));
 
@@ -506,9 +499,7 @@ pub extern "C" fn GDKRPC_get_subaccount(
     index: u32,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
-
+    let sess = safe_ref!(sess);
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let account = tryit!(wallet.get_account(index));
 
@@ -525,8 +516,7 @@ pub extern "C" fn GDKRPC_get_mnemonic_passphrase(
     _password: *const c_char,
     ret: *mut *const c_char,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     ok!(ret, make_str(wallet.mnemonic()))
 }
@@ -540,7 +530,7 @@ pub extern "C" fn GDKRPC_auth_handler_get_status(
     auth_handler: *const GA_auth_handler,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let auth_handler = unsafe { &*auth_handler };
+    let auth_handler = safe_ref!(auth_handler);
     let status = auth_handler.to_json();
 
     ok_json!(ret, status)
@@ -555,9 +545,7 @@ pub extern "C" fn GDKRPC_get_available_currencies(
     sess: *const GDKRPC_session,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
-
+    let sess = safe_ref!(sess);
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let currencies = wallet.get_available_currencies();
 
@@ -570,8 +558,7 @@ pub extern "C" fn GDKRPC_convert_amount(
     value_details: *const GDKRPC_json,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
+    let sess = safe_ref!(sess);
     let value_details = &unsafe { &*value_details }.0;
 
     debug!("GA_convert_amount() {:?}", value_details);
@@ -588,9 +575,7 @@ pub extern "C" fn GDKRPC_get_fee_estimates(
     sess: *const GDKRPC_session,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
-
+    let sess = safe_ref!(sess);
     let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
     let estimates = tryit!(wallet.get_fee_estimates().or_err("fee estimates unavailable"));
 
@@ -607,9 +592,7 @@ pub extern "C" fn GDKRPC_set_notification_handler(
     handler: extern "C" fn(*const libc::c_void, *const GDKRPC_json),
     context: *const libc::c_void,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
-
+    let sess = safe_mut_ref!(sess);
     sess.notify = Some((handler, context));
 
     GA_OK
@@ -624,9 +607,7 @@ pub extern "C" fn GDKRPC_get_settings(
     sess: *const GDKRPC_session,
     ret: *mut *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get(sess).unwrap();
-
+    let sess = safe_ref!(sess);
     ok_json!(ret, json!(sess.settings))
 }
 
@@ -636,8 +617,7 @@ pub extern "C" fn GDKRPC_change_settings(
     settings: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
     let new_settings = &unsafe { &*settings }.0;
 
     // XXX should we allow patching just some setting fields instead of replacing it?
@@ -791,15 +771,13 @@ pub extern "C" fn GDKRPC_login_with_pin(
     _pin: *const c_char,
     pin_data: *const GDKRPC_json,
 ) -> i32 {
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
-
     let pin_data = &unsafe { &*pin_data }.0;
     let entropy_hex = tryit!(pin_data["encrypted_data"].as_str().req()).to_string();
     let entropy = tryit!(hex::decode(&entropy_hex));
     let mnemonic = wally::bip39_mnemonic_from_bytes(&entropy);
 
     debug!("GA_login_with_pin mnemonic: {}", mnemonic);
+    let sess = safe_mut_ref!(sess);
     let network = tryit!(sess.network.or_err("session not connected"));
     sess.wallet = Some(tryit!(Wallet::login(network, &mnemonic)));
 
@@ -898,8 +876,7 @@ pub extern "C" fn GDKRPC_register_network(
 #[no_mangle]
 pub extern "C" fn GDKRPC_test_tick(sess: *mut GDKRPC_session) -> i32 {
     debug!("GA_test_tick()");
-    let sm = SESS_MANAGER.lock().unwrap();
-    let sess = sm.get_mut(sess).unwrap();
+    let sess = safe_mut_ref!(sess);
     tryit!(sess.tick());
     GA_OK
 }
