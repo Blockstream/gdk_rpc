@@ -46,6 +46,7 @@ pub mod wally;
 
 use serde_json::{from_value, Value};
 
+use std::ffi::CString;
 use std::mem::transmute;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
@@ -70,11 +71,11 @@ lazy_static! {
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct GA_json(Value);
+pub struct GDKRPC_json(Value);
 
-impl GA_json {
-    fn new(data: Value) -> *const GA_json {
-        unsafe { transmute(Box::new(GA_json(data))) }
+impl GDKRPC_json {
+    fn new(data: Value) -> *const GDKRPC_json {
+        unsafe { transmute(Box::new(GDKRPC_json(data))) }
     }
 }
 
@@ -139,7 +140,7 @@ macro_rules! ok_json {
     ($t:expr, $x:expr) => {{
         let x = json!($x);
         debug!("ok_json!() {:?}", x);
-        ok!($t, GA_json::new(x))
+        ok!($t, GDKRPC_json::new(x))
     }};
 }
 
@@ -148,7 +149,7 @@ macro_rules! ok_json {
 //
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_get_networks(ret: *mut *const GA_json) -> i32 {
+pub extern "C" fn GDKRPC_get_networks(ret: *mut *const GDKRPC_json) -> i32 {
     let networks = Network::list();
     let names: Vec<String> = networks.keys().cloned().collect();
 
@@ -166,7 +167,7 @@ pub extern "C" fn GDKRPC_get_networks(ret: *mut *const GA_json) -> i32 {
 static INIT_LOGGER: Once = ONCE_INIT;
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_init(config: *const GA_json) -> i32 {
+pub extern "C" fn GDKRPC_init(config: *const GDKRPC_json) -> i32 {
     debug!("GA_init() config: {:?}", config);
 
     #[cfg(feature = "android_logger")]
@@ -237,7 +238,7 @@ pub extern "C" fn GDKRPC_disconnect(sess: *mut GA_session) -> i32 {
 #[no_mangle]
 pub extern "C" fn GDKRPC_register_user(
     sess: *mut GA_session,
-    _hw_device: *const GA_json,
+    _hw_device: *const GDKRPC_json,
     mnemonic: *const c_char,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
@@ -255,7 +256,7 @@ pub extern "C" fn GDKRPC_register_user(
 #[no_mangle]
 pub extern "C" fn GDKRPC_login(
     sess: *mut GA_session,
-    _hw_device: *const GA_json,
+    _hw_device: *const GDKRPC_json,
     mnemonic: *const c_char,
     password: *const c_char,
     ret: *mut *const GA_auth_handler,
@@ -295,8 +296,8 @@ pub extern "C" fn GDKRPC_login(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_transactions(
     sess: *const GA_session,
-    details: *const GA_json,
-    ret: *mut *const GA_json,
+    details: *const GDKRPC_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -314,7 +315,7 @@ pub extern "C" fn GDKRPC_get_transactions(
 pub extern "C" fn GDKRPC_get_transaction_details(
     sess: *const GA_session,
     txid: *const c_char,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -329,8 +330,8 @@ pub extern "C" fn GDKRPC_get_transaction_details(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_balance(
     sess: *const GA_session,
-    details: *const GA_json,
-    ret: *mut *const GA_json,
+    details: *const GDKRPC_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -373,8 +374,8 @@ pub extern "C" fn GDKRPC_set_transaction_memo(
 #[no_mangle]
 pub extern "C" fn GDKRPC_create_transaction(
     sess: *const GA_session,
-    details: *const GA_json,
-    ret: *mut *const GA_json,
+    details: *const GDKRPC_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -420,7 +421,7 @@ pub extern "C" fn GDKRPC_create_transaction(
 #[no_mangle]
 pub extern "C" fn GDKRPC_sign_transaction(
     sess: *const GA_session,
-    tx_detail_unsigned: *const GA_json,
+    tx_detail_unsigned: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
@@ -440,7 +441,7 @@ pub extern "C" fn GDKRPC_sign_transaction(
 #[no_mangle]
 pub extern "C" fn GDKRPC_send_transaction(
     sess: *const GA_session,
-    tx_detail_signed: *const GA_json,
+    tx_detail_signed: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
@@ -476,8 +477,8 @@ pub extern "C" fn GDKRPC_broadcast_transaction(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_receive_address(
     sess: *const GA_session,
-    addr_details: *const GA_json,
-    ret: *mut *const GA_json,
+    addr_details: *const GDKRPC_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -494,7 +495,10 @@ pub extern "C" fn GDKRPC_get_receive_address(
 //
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
+pub extern "C" fn GDKRPC_get_subaccounts(
+    sess: *const GA_session,
+    ret: *mut *const GDKRPC_json,
+) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
@@ -509,7 +513,7 @@ pub extern "C" fn GDKRPC_get_subaccounts(sess: *const GA_session, ret: *mut *con
 pub extern "C" fn GDKRPC_get_subaccount(
     sess: *const GA_session,
     index: u32,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -543,7 +547,7 @@ pub extern "C" fn GDKRPC_get_mnemonic_passphrase(
 #[no_mangle]
 pub extern "C" fn GDKRPC_auth_handler_get_status(
     auth_handler: *const GA_auth_handler,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let auth_handler = unsafe { &*auth_handler };
     let status = auth_handler.to_json();
@@ -558,7 +562,7 @@ pub extern "C" fn GDKRPC_auth_handler_get_status(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_available_currencies(
     sess: *const GA_session,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -572,8 +576,8 @@ pub extern "C" fn GDKRPC_get_available_currencies(
 #[no_mangle]
 pub extern "C" fn GDKRPC_convert_amount(
     sess: *const GA_session,
-    value_details: *const GA_json,
-    ret: *mut *const GA_json,
+    value_details: *const GDKRPC_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -591,7 +595,7 @@ pub extern "C" fn GDKRPC_convert_amount(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_fee_estimates(
     sess: *const GA_session,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
@@ -609,7 +613,7 @@ pub extern "C" fn GDKRPC_get_fee_estimates(
 #[no_mangle]
 pub extern "C" fn GDKRPC_set_notification_handler(
     sess: *mut GA_session,
-    handler: extern "C" fn(*const libc::c_void, *const GA_json),
+    handler: extern "C" fn(*const libc::c_void, *const GDKRPC_json),
     context: *const libc::c_void,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
@@ -625,7 +629,10 @@ pub extern "C" fn GDKRPC_set_notification_handler(
 //
 
 #[no_mangle]
-pub extern "C" fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const GA_json) -> i32 {
+pub extern "C" fn GDKRPC_get_settings(
+    sess: *const GA_session,
+    ret: *mut *const GDKRPC_json,
+) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get(sess).unwrap();
 
@@ -635,7 +642,7 @@ pub extern "C" fn GDKRPC_get_settings(sess: *const GA_session, ret: *mut *const 
 #[no_mangle]
 pub extern "C" fn GDKRPC_change_settings(
     sess: *mut GA_session,
-    settings: *const GA_json,
+    settings: *const GDKRPC_json,
     ret: *mut *const GA_auth_handler,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
@@ -649,13 +656,105 @@ pub extern "C" fn GDKRPC_change_settings(
 }
 
 //
+// JSON utilities
+//
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_to_string(
+    json: *const GDKRPC_json,
+    ret: *mut *const c_char,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let res = json.to_string();
+    ok!(ret, make_str(res))
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_string_to_json(
+    jstr: *const c_char,
+    ret: *mut *const GDKRPC_json,
+) -> i32 {
+    let jstr = read_str(jstr);
+    let json: Value = tryit!(serde_json::from_str(&jstr));
+    ok_json!(ret, json)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_string(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut *const c_char,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_str().req());
+    ok!(ret, make_str(res.to_string()))
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_uint32(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut u32,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_u64().req()) as u32;
+    ok!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_uint64(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut u64,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let res = tryit!(json[path].as_u64().req());
+    ok!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_convert_json_value_to_json(
+    json: *const GDKRPC_json,
+    path: *const c_char,
+    ret: *mut *const GDKRPC_json,
+) -> i32 {
+    let json = &unsafe { &*json }.0;
+    let path = read_str(path);
+    let jstr = tryit!(json[path].as_str().req());
+    let res: Value = tryit!(serde_json::from_str(jstr));
+    ok_json!(ret, res)
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_destroy_json(ptr: *mut GDKRPC_json) -> i32 {
+    debug!("GA_destroy_json({:?})", ptr);
+    // TODO make sure this works
+    unsafe {
+        drop(&*ptr);
+    }
+    GA_OK
+}
+
+#[no_mangle]
+pub extern "C" fn GDKRPC_destroy_string(ptr: *mut c_char) -> i32 {
+    unsafe {
+        // retake pointer and drop
+        let _ = CString::from_raw(ptr);
+    }
+    GA_OK
+}
+
+//
 // Unimplemented, but gracefully degrades
 //
 
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_twofactor_config(
     _sess: *const GA_session,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     // 2FA is always off
     ok_json!(
@@ -677,7 +776,7 @@ pub extern "C" fn GDKRPC_set_pin(
     mnemonic: *const c_char,
     _pin: *const c_char,
     device_id: *const c_char,
-    ret: *mut *const GA_json,
+    ret: *mut *const GDKRPC_json,
 ) -> i32 {
     let mnemonic = read_str(mnemonic);
     let device_id = read_str(device_id);
@@ -699,7 +798,7 @@ pub extern "C" fn GDKRPC_set_pin(
 pub extern "C" fn GDKRPC_login_with_pin(
     sess: *mut GA_session,
     _pin: *const c_char,
-    pin_data: *const GA_json,
+    pin_data: *const GDKRPC_json,
 ) -> i32 {
     let sm = SESS_MANAGER.lock().unwrap();
     let sess = sm.get_mut(sess).unwrap();
@@ -762,7 +861,7 @@ pub extern "C" fn GDKRPC_remove_account(
 #[no_mangle]
 pub extern "C" fn GDKRPC_create_subaccount(
     _sess: *const GA_session,
-    _details: *const GA_json,
+    _details: *const GDKRPC_json,
     _ret: *mut *const GA_auth_handler,
 ) -> i32 {
     GA_ERROR
@@ -771,8 +870,8 @@ pub extern "C" fn GDKRPC_create_subaccount(
 #[no_mangle]
 pub extern "C" fn GDKRPC_get_unspent_outputs(
     _sess: *const GA_session,
-    _details: *const GA_json,
-    _ret: *mut *const GA_json,
+    _details: *const GDKRPC_json,
+    _ret: *mut *const GDKRPC_json,
 ) -> i32 {
     GA_ERROR
 }
@@ -783,7 +882,7 @@ pub extern "C" fn GDKRPC_get_unspent_outputs_for_private_key(
     _private_key: *const c_char,
     _password: *const c_char,
     _unused: u32,
-    _ret: *mut *const GA_json,
+    _ret: *mut *const GDKRPC_json,
 ) -> i32 {
     GA_ERROR
 }
@@ -796,7 +895,7 @@ pub extern "C" fn GDKRPC_send_nlocktimes(_sess: *const GA_session) -> i32 {
 #[no_mangle]
 pub extern "C" fn GDKRPC_register_network(
     _name: *const c_char,
-    _network_details: *const GA_json,
+    _network_details: *const GDKRPC_json,
 ) -> i32 {
     GA_ERROR
 }
