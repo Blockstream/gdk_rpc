@@ -23,7 +23,7 @@ pub struct GDKRPC_session {
 }
 
 impl GDKRPC_session {
-    fn new() -> *mut GDKRPC_session {
+    pub fn new() -> *mut GDKRPC_session {
         let sess = GDKRPC_session {
             settings: Settings::default(),
             network: None,
