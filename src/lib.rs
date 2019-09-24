@@ -477,36 +477,6 @@ pub extern "C" fn GDKRPC_get_receive_address(
 }
 
 //
-// Subaccounts
-//
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_get_subaccounts(
-    sess: *const GDKRPC_session,
-    ret: *mut *const GDKRPC_json,
-) -> i32 {
-    let sess = safe_ref!(sess);
-    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let account = tryit!(wallet.get_account(0));
-
-    // always returns a list of a single account
-    ok_json!(ret, [account])
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_get_subaccount(
-    sess: *const GDKRPC_session,
-    index: u32,
-    ret: *mut *const GDKRPC_json,
-) -> i32 {
-    let sess = safe_ref!(sess);
-    let wallet = tryit!(sess.wallet().or_err("no loaded wallet"));
-    let account = tryit!(wallet.get_account(index));
-
-    ok_json!(ret, account)
-}
-
-//
 // Mnemonic
 //
 
@@ -797,41 +767,6 @@ pub extern "C" fn GDKRPC_connect_with_proxy(
     _proxy_uri: *const c_char,
     _use_tor: u32,
     _log_level: u32,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_set_watch_only(
-    _sess: *mut GDKRPC_session,
-    _username: *const c_char,
-    _password: *const c_char,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_login_watch_only(
-    _sess: *mut GDKRPC_session,
-    _username: *const c_char,
-    _password: *const c_char,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_remove_account(
-    _sess: *mut GDKRPC_session,
-    _ret: *mut *const GA_auth_handler,
-) -> i32 {
-    GA_ERROR
-}
-
-#[no_mangle]
-pub extern "C" fn GDKRPC_create_subaccount(
-    _sess: *const GDKRPC_session,
-    _details: *const GDKRPC_json,
-    _ret: *mut *const GA_auth_handler,
 ) -> i32 {
     GA_ERROR
 }
