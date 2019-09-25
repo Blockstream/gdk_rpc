@@ -1,13 +1,12 @@
 [package]
 name = "gdk-rpc"
-build = "build.rs"
 version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 license = "(MIT)"
 edition = "2018"
 
 [lib]
-crate-type = ["dylib", "staticlib"]
+crate-type = ["staticlib"]
 
 [features]
 default = ["liquid"]
