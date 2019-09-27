@@ -207,7 +207,7 @@ impl Wallet {
                 warn!("Received warning when creating wallet {} in Core: {}", fp, warning,)
             }
         }
-        let rpc = network.connect(Some(fp))?;
+        let rpc = network.connect(Some(&fp))?;
 
         // Check if the user was already registered.
         let state_addr = Wallet::persistent_state_address(network.id(), &master_xpriv);
@@ -248,7 +248,7 @@ impl Wallet {
         let tmp_rpc = network.connect(None)?;
         tmp_rpc.load_wallet(&fp)?;
 
-        let rpc = network.connect(Some(fp))?;
+        let rpc = network.connect(Some(&fp))?;
         let state_addr = Wallet::persistent_state_address(network.id(), &master_xpriv);
         let state = Wallet::load_persistent_state(&rpc, &state_addr)?;
         Ok(Wallet {
