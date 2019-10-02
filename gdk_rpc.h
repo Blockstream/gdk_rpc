@@ -93,33 +93,6 @@ GDK_API int GDKRPC_disconnect(struct GDKRPC_session* session);
 GDK_API int GDKRPC_check_proxy_connectivity(const GDKRPC_json* params);
 
 /**
- * Get JSON data from an https server.
- *
- * :param session: The session to use.
- * :param params: the :ref:`params-data` of the server to connect to.
- * :param output: Destination for the output JSON.
- *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
- */
-GDK_API int GDKRPC_http_get(struct GDKRPC_session* session, const GDKRPC_json* params, GDKRPC_json** output);
-
-/**
- *
- * Refresh the internal cache asset information.
- *
- * :param session: The session to use.
- * :param output: Destination for the assets JSON.
- *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
- */
-GDK_API int GDKRPC_refresh_assets(struct GDKRPC_session* session, GDKRPC_json** output);
-
-/**
- * Validate asset domain name.
- * (This is a interface stub)
- *
- */
-GDK_API int GDKRPC_validate_asset_domain_name(struct GDKRPC_session* session, const GDKRPC_json* params, GDKRPC_json** output);
-
-/**
  * Create a new user account using a hardware wallet/HSM/TPM.
  *
  * :param session: The session to use.
@@ -152,90 +125,6 @@ GDK_API int GDKRPC_login(struct GDKRPC_session* session, const GDKRPC_json* hw_d
  * :param pin_data: The :ref:`pin-data` returned by `GA_set_pin`.
  */
 GDK_API int GDKRPC_login_with_pin(struct GDKRPC_session* session, const char* pin, const GDKRPC_json* pin_data);
-
-/**
- * Set a watch-only login for the wallet.
- *
- * :param session: The session to use.
- * :param username: The username.
- * :param password: The password.
- */
-GDK_API int GDKRPC_set_watch_only(struct GDKRPC_session* session, const char* username, const char* password);
-
-/**
- * Get the current watch-only login for the wallet, if any.
- *
- * :param session: The session to use.
- * :param username: Destination for the watch-only username. Empty string if not set.
- *|     Returned string should be freed using `GA_destroy_string`.
- */
-GDK_API int GDKRPC_get_watch_only_username(struct GDKRPC_session* session, char** username);
-
-/**
- * Authenticate a user in watch only mode.
- *
- * :param session: The session to use.
- * :param username: The username.
- * :param password: The password.
- */
-GDK_API int GDKRPC_login_watch_only(struct GDKRPC_session* session, const char* username, const char* password);
-
-/**
- * Remove an account.
- *
- * :param session: The session to use.
- * :param call: Destination for the resulting GA_auth_handler to perform the removal.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_remove_account(struct GDKRPC_session* session, struct GA_auth_handler** call);
-
-/**
- * Create a subaccount.
- *
- * :param session: The session to use.
- * :param details: The :ref:`subaccount`. "name" (which must not be already used in
- *|     the wallet) and "type" (either "2of2" or "2of3") must be populated. For
- *|     type "2of3" the caller may provide either "recovery_mnemonic" or "recovery_xpub"
- *|     if they do not wish to have a mnemonic passphrase generated automatically.
- *|     All other fields are ignored.
- * :param subaccount: Destination for the created subaccount details. For 2of3
- *|     subaccounts the field "recovery_xpub" will be populated, and "recovery_mnemonic"
- *|     will contain the recovery mnemonic passphrase if one was generated. These
- *|     values should be stored safely by the caller as they will not be returned again
- *|     by any GDK call such as GA_get_subaccounts.
- * :param call: Destination for the resulting GA_auth_handler to perform the creation.
- *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
- */
-GDK_API int GDKRPC_create_subaccount(struct GDKRPC_session* session, const GDKRPC_json* details, struct GA_auth_handler** call);
-
-/**
- * Get the user's subaccount details.
- *
- * :param session: The session to use.
- * :param subaccounts: Destination for the user's :ref:`subaccount-list`.
- *|      Returned GDKRPC_json should be freed using `GA_destroy_json`.
- */
-GDK_API int GDKRPC_get_subaccounts(struct GDKRPC_session* session, GDKRPC_json** subaccounts);
-
-/**
- * Get subaccount details.
- *
- * :param session: The session to use.
- * :param subaccount: The value of "pointer" from :ref:`subaccount-list` for the subaccount.
- * :param output: Destination for the :ref:`subaccount-detail`.
- *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
- */
-GDK_API int GDKRPC_get_subaccount(struct GDKRPC_session* session, uint32_t subaccount, GDKRPC_json** output);
-
-/**
- * Rename a subaccount.
- *
- * :param session: The session to use.
- * :param subaccount: The value of "pointer" from :ref:`subaccount-list` or
- *|                   :ref:`subaccount-detail` for the subaccount to rename.
- * :param new_name: New name for the subaccount.
- */
-GDK_API int GDKRPC_rename_subaccount(struct GDKRPC_session* session, uint32_t subaccount, const char* new_name);
 
 /**
  * Get a page of the user's transaction history.

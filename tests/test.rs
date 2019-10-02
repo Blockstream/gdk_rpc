@@ -69,13 +69,6 @@ extern "C" {
     fn GDKRPC_create_session(ret: *mut *mut GDKRPC_session) -> i32;
     fn GDKRPC_connect(sess: *mut GDKRPC_session, network: *const c_char, log_level: u32) -> i32;
 
-    fn GDKRPC_get_subaccounts(sess: *const GDKRPC_session, ret: *mut *const GDKRPC_json) -> i32;
-    fn GDKRPC_get_subaccount(
-        sess: *const GDKRPC_session,
-        index: u32,
-        ret: *mut *const GDKRPC_json,
-    ) -> i32;
-
     fn GDKRPC_get_settings(sess: *const GDKRPC_session, ret: *mut *const GDKRPC_json) -> i32;
     fn GDKRPC_change_settings(
         sess: *const GDKRPC_session,
@@ -357,17 +350,6 @@ fn test_estimates() {
     let mut estimates: *const GDKRPC_json = std::ptr::null_mut();
     assert_eq!(GA_OK, unsafe { GDKRPC_get_fee_estimates(sess, &mut estimates) });
     info!("fee estimates: {:?}\n", read_json(estimates));
-
-    teardown(sess);
-}
-
-#[test]
-fn test_subaccount() {
-    let sess = setup();
-
-    let mut subaccounts: *const GDKRPC_json = std::ptr::null_mut();
-    assert_eq!(GA_OK, unsafe { GDKRPC_get_subaccounts(sess, &mut subaccounts) });
-    debug!("subaccounts: {:#?}\n", read_json(subaccounts));
 
     teardown(sess);
 }

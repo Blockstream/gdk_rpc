@@ -339,11 +339,7 @@ impl Wallet {
         Ok(msgs)
     }
 
-    pub fn get_account(&self, subaccount: u32) -> Result<Value, Error> {
-        if subaccount != 0 {
-            throw!("multi-account is unsupported");
-        }
-
+    pub fn get_account(&self) -> Result<Value, Error> {
         let has_transactions = self._get_transactions(1, 0)?.1;
 
         extend(
@@ -539,8 +535,6 @@ impl Wallet {
     }
 
     pub fn get_receive_address(&self, _details: &Value) -> Result<Value, Error> {
-        // details: {"subaccount":0,"address_type":"csv"}
-
         let address = self.next_address(&self.external_xpriv, &self.next_external_child)?;
         //  {
         //    "address": "2N2x4EgizS2w3DUiWYWW9pEf4sGYRfo6PAX",
@@ -549,7 +543,6 @@ impl Wallet {
         //    "pointer": 13,
         //    "script": "52210338832debc5e15ce143d5cf9241147ac0019e7516d3d9569e04b0e18f3278718921025dfaa85d64963252604e1b139b40182bb859a9e2e1aa2904876c34e82158d85452ae",
         //    "script_type": 14,
-        //    "subaccount": 0,
         //    "subtype": null
         //  }
         Ok(json!({
@@ -746,9 +739,6 @@ fn format_gdk_tx(txdesc: &Value, raw_tx: &[u8], network: NetworkId) -> Result<Va
         "server_signed": false,
         "user_signed": true,
         "instant": false,
-
-        "subaccount": 0,
-        "subaccounts": [],
 
         "fee": fee,
         "fee_rate": (fee as f64)/(vsize as f64),
