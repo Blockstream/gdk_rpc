@@ -40,7 +40,7 @@ extern "C" {
 #define GA_FALSE 0
 
 /** A server session */
-struct GA_session;
+struct GDKRPC_session;
 
 /** A Parsed JSON object */
 typedef struct GDKRPC_json GDKRPC_json;
@@ -56,29 +56,19 @@ typedef void (*GA_notification_handler)(void* context, const GDKRPC_json* detail
 #define GA_MEMO_BIP70 1
 
 /**
- * Set the global configuration and run one-time initialization code. This function must
- * be called once and only once before calling any other functions. When used in a
- * multi-threaded context this function should be called before starting any other
- * threads that call other gdk functions.
- *
- * :param config: Configuration object
- */
-GDK_API int GDKRPC_init(const GDKRPC_json* config);
-
-/**
  * Create a new session.
  *
  * :param session: Destination for the resulting session.
  *|     Returned session should be freed using `GA_destroy_session`.
  */
-GDK_API int GDKRPC_create_session(struct GA_session** session);
+GDK_API int GDKRPC_create_session(struct GDKRPC_session** session);
 
 /**
  * Free a session allocated by `GA_create_session`.
  *
  * :param session: Session to free.
  */
-GDK_API int GDKRPC_destroy_session(struct GA_session* session);
+GDK_API int GDKRPC_destroy_session(struct GDKRPC_session* session);
 
 /**
  * Connect to a remote server using the specified network.
@@ -86,14 +76,14 @@ GDK_API int GDKRPC_destroy_session(struct GA_session* session);
  * :param session: The session to use.
  * :param net_params: The :ref:`net-params` of the network to connect to.
  */
-GDK_API int GDKRPC_connect(struct GA_session* session, const GDKRPC_json* net_params);
+GDK_API int GDKRPC_connect(struct GDKRPC_session* session, const GDKRPC_json* net_params);
 
 /**
  * Disconnect from a connected remote server.
  *
  * :param session: The session to use.
  */
-GDK_API int GDKRPC_disconnect(struct GA_session* session);
+GDK_API int GDKRPC_disconnect(struct GDKRPC_session* session);
 
 /**
  * Check if server can be reached via the proxy.
@@ -110,7 +100,7 @@ GDK_API int GDKRPC_check_proxy_connectivity(const GDKRPC_json* params);
  * :param output: Destination for the output JSON.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_http_get(struct GA_session* session, const GDKRPC_json* params, GDKRPC_json** output);
+GDK_API int GDKRPC_http_get(struct GDKRPC_session* session, const GDKRPC_json* params, GDKRPC_json** output);
 
 /**
  *
@@ -120,14 +110,14 @@ GDK_API int GDKRPC_http_get(struct GA_session* session, const GDKRPC_json* param
  * :param output: Destination for the assets JSON.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_refresh_assets(struct GA_session* session, GDKRPC_json** output);
+GDK_API int GDKRPC_refresh_assets(struct GDKRPC_session* session, GDKRPC_json** output);
 
 /**
  * Validate asset domain name.
  * (This is a interface stub)
  *
  */
-GDK_API int GDKRPC_validate_asset_domain_name(struct GA_session* session, const GDKRPC_json* params, GDKRPC_json** output);
+GDK_API int GDKRPC_validate_asset_domain_name(struct GDKRPC_session* session, const GDKRPC_json* params, GDKRPC_json** output);
 
 /**
  * Create a new user account using a hardware wallet/HSM/TPM.
@@ -139,7 +129,7 @@ GDK_API int GDKRPC_validate_asset_domain_name(struct GA_session* session, const 
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
 GDK_API int GDKRPC_register_user(
-    struct GA_session* session, const GDKRPC_json* hw_device, const char* mnemonic, struct GA_auth_handler** call);
+    struct GDKRPC_session* session, const GDKRPC_json* hw_device, const char* mnemonic, struct GA_auth_handler** call);
 
 /**
  * Authenticate a user using a hardware wallet/HSM/TPM.
@@ -151,7 +141,7 @@ GDK_API int GDKRPC_register_user(
  * :param call: Destination for the resulting GA_auth_handler to perform the login.
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
-GDK_API int GDKRPC_login(struct GA_session* session, const GDKRPC_json* hw_device, const char* mnemonic, const char* password,
+GDK_API int GDKRPC_login(struct GDKRPC_session* session, const GDKRPC_json* hw_device, const char* mnemonic, const char* password,
     struct GA_auth_handler** call);
 
 /**
@@ -161,7 +151,7 @@ GDK_API int GDKRPC_login(struct GA_session* session, const GDKRPC_json* hw_devic
  * :param pin: The user PIN.
  * :param pin_data: The :ref:`pin-data` returned by `GA_set_pin`.
  */
-GDK_API int GDKRPC_login_with_pin(struct GA_session* session, const char* pin, const GDKRPC_json* pin_data);
+GDK_API int GDKRPC_login_with_pin(struct GDKRPC_session* session, const char* pin, const GDKRPC_json* pin_data);
 
 /**
  * Set a watch-only login for the wallet.
@@ -170,7 +160,7 @@ GDK_API int GDKRPC_login_with_pin(struct GA_session* session, const char* pin, c
  * :param username: The username.
  * :param password: The password.
  */
-GDK_API int GDKRPC_set_watch_only(struct GA_session* session, const char* username, const char* password);
+GDK_API int GDKRPC_set_watch_only(struct GDKRPC_session* session, const char* username, const char* password);
 
 /**
  * Get the current watch-only login for the wallet, if any.
@@ -179,7 +169,7 @@ GDK_API int GDKRPC_set_watch_only(struct GA_session* session, const char* userna
  * :param username: Destination for the watch-only username. Empty string if not set.
  *|     Returned string should be freed using `GA_destroy_string`.
  */
-GDK_API int GDKRPC_get_watch_only_username(struct GA_session* session, char** username);
+GDK_API int GDKRPC_get_watch_only_username(struct GDKRPC_session* session, char** username);
 
 /**
  * Authenticate a user in watch only mode.
@@ -188,7 +178,7 @@ GDK_API int GDKRPC_get_watch_only_username(struct GA_session* session, char** us
  * :param username: The username.
  * :param password: The password.
  */
-GDK_API int GDKRPC_login_watch_only(struct GA_session* session, const char* username, const char* password);
+GDK_API int GDKRPC_login_watch_only(struct GDKRPC_session* session, const char* username, const char* password);
 
 /**
  * Remove an account.
@@ -197,7 +187,7 @@ GDK_API int GDKRPC_login_watch_only(struct GA_session* session, const char* user
  * :param call: Destination for the resulting GA_auth_handler to perform the removal.
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
-GDK_API int GDKRPC_remove_account(struct GA_session* session, struct GA_auth_handler** call);
+GDK_API int GDKRPC_remove_account(struct GDKRPC_session* session, struct GA_auth_handler** call);
 
 /**
  * Create a subaccount.
@@ -216,7 +206,7 @@ GDK_API int GDKRPC_remove_account(struct GA_session* session, struct GA_auth_han
  * :param call: Destination for the resulting GA_auth_handler to perform the creation.
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
-GDK_API int GDKRPC_create_subaccount(struct GA_session* session, const GDKRPC_json* details, struct GA_auth_handler** call);
+GDK_API int GDKRPC_create_subaccount(struct GDKRPC_session* session, const GDKRPC_json* details, struct GA_auth_handler** call);
 
 /**
  * Get the user's subaccount details.
@@ -225,7 +215,7 @@ GDK_API int GDKRPC_create_subaccount(struct GA_session* session, const GDKRPC_js
  * :param subaccounts: Destination for the user's :ref:`subaccount-list`.
  *|      Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_subaccounts(struct GA_session* session, GDKRPC_json** subaccounts);
+GDK_API int GDKRPC_get_subaccounts(struct GDKRPC_session* session, GDKRPC_json** subaccounts);
 
 /**
  * Get subaccount details.
@@ -235,7 +225,7 @@ GDK_API int GDKRPC_get_subaccounts(struct GA_session* session, GDKRPC_json** sub
  * :param output: Destination for the :ref:`subaccount-detail`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_subaccount(struct GA_session* session, uint32_t subaccount, GDKRPC_json** output);
+GDK_API int GDKRPC_get_subaccount(struct GDKRPC_session* session, uint32_t subaccount, GDKRPC_json** output);
 
 /**
  * Rename a subaccount.
@@ -245,7 +235,7 @@ GDK_API int GDKRPC_get_subaccount(struct GA_session* session, uint32_t subaccoun
  *|                   :ref:`subaccount-detail` for the subaccount to rename.
  * :param new_name: New name for the subaccount.
  */
-GDK_API int GDKRPC_rename_subaccount(struct GA_session* session, uint32_t subaccount, const char* new_name);
+GDK_API int GDKRPC_rename_subaccount(struct GDKRPC_session* session, uint32_t subaccount, const char* new_name);
 
 /**
  * Get a page of the user's transaction history.
@@ -257,7 +247,7 @@ GDK_API int GDKRPC_rename_subaccount(struct GA_session* session, uint32_t subacc
  *
  * .. note:: Transactions are returned from newest to oldest with up to 30 transactions per page.
  */
-GDK_API int GDKRPC_get_transactions(struct GA_session* session, const GDKRPC_json* details, GDKRPC_json** txs);
+GDK_API int GDKRPC_get_transactions(struct GDKRPC_session* session, const GDKRPC_json* details, GDKRPC_json** txs);
 
 /**
  * Get a new address to receive coins to.
@@ -267,7 +257,7 @@ GDK_API int GDKRPC_get_transactions(struct GA_session* session, const GDKRPC_jso
  * :param output: Destination for the generated address :ref:`receive-address`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_receive_address(struct GA_session* session, const GDKRPC_json* details, GDKRPC_json** output);
+GDK_API int GDKRPC_get_receive_address(struct GDKRPC_session* session, const GDKRPC_json* details, GDKRPC_json** output);
 
 /**
  * Get the user's unspent transaction outputs.
@@ -277,7 +267,7 @@ GDK_API int GDKRPC_get_receive_address(struct GA_session* session, const GDKRPC_
  * :param utxos: Destination for the returned utxos (same format as :ref:`tx-list`).
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_unspent_outputs(struct GA_session* session, const GDKRPC_json* details, GDKRPC_json** utxos);
+GDK_API int GDKRPC_get_unspent_outputs(struct GDKRPC_session* session, const GDKRPC_json* details, GDKRPC_json** utxos);
 
 /**
  * Get the unspent transaction outputs associated with a non-wallet private key.
@@ -292,7 +282,7 @@ GDK_API int GDKRPC_get_unspent_outputs(struct GA_session* session, const GDKRPC_
  * .. note:: Neither the private key or its derived public key are transmitted.
  */
 GDK_API int GDKRPC_get_unspent_outputs_for_private_key(
-    struct GA_session* session, const char* private_key, const char* password, uint32_t unused, GDKRPC_json** utxos);
+    struct GDKRPC_session* session, const char* private_key, const char* password, uint32_t unused, GDKRPC_json** utxos);
 
 /**
  * Get a transaction's details.
@@ -302,7 +292,7 @@ GDK_API int GDKRPC_get_unspent_outputs_for_private_key(
  * :param transaction: Destination for the :ref:`tx-detail`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_transaction_details(struct GA_session* session, const char* txhash_hex, GDKRPC_json** transaction);
+GDK_API int GDKRPC_get_transaction_details(struct GDKRPC_session* session, const char* txhash_hex, GDKRPC_json** transaction);
 
 /**
  * The sum of unspent outputs destined to user's wallet.
@@ -312,7 +302,7 @@ GDK_API int GDKRPC_get_transaction_details(struct GA_session* session, const cha
  * :param balance: The returned :ref:`balance-data`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_balance(struct GA_session* session, const GDKRPC_json* details, GDKRPC_json** balance);
+GDK_API int GDKRPC_get_balance(struct GDKRPC_session* session, const GDKRPC_json* details, GDKRPC_json** balance);
 
 /**
  * The list of allowed currencies for all available pricing sources.
@@ -321,7 +311,7 @@ GDK_API int GDKRPC_get_balance(struct GA_session* session, const GDKRPC_json* de
  * :param currencies: The returned list of :ref:`currencies`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_available_currencies(struct GA_session* session, GDKRPC_json** currencies);
+GDK_API int GDKRPC_get_available_currencies(struct GDKRPC_session* session, GDKRPC_json** currencies);
 
 /**
  * Convert Fiat to BTC and vice-versa.
@@ -331,7 +321,7 @@ GDK_API int GDKRPC_get_available_currencies(struct GA_session* session, GDKRPC_j
  * :param output: Destination for the converted values :ref:`balance-data`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_convert_amount(struct GA_session* session, const GDKRPC_json* value_details, GDKRPC_json** output);
+GDK_API int GDKRPC_convert_amount(struct GDKRPC_session* session, const GDKRPC_json* value_details, GDKRPC_json** output);
 
 /**
  * Set a PIN for the user wallet.
@@ -344,7 +334,7 @@ GDK_API int GDKRPC_convert_amount(struct GA_session* session, const GDKRPC_json*
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
 GDK_API int GDKRPC_set_pin(
-    struct GA_session* session, const char* mnemonic, const char* pin, const char* device_id, GDKRPC_json** pin_data);
+    struct GDKRPC_session* session, const char* mnemonic, const char* pin, const char* device_id, GDKRPC_json** pin_data);
 
 /**
  * Construct a transaction.
@@ -355,7 +345,7 @@ GDK_API int GDKRPC_set_pin(
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
 GDK_API int GDKRPC_create_transaction(
-    struct GA_session* session, const GDKRPC_json* transaction_details, GDKRPC_json** transaction);
+    struct GDKRPC_session* session, const GDKRPC_json* transaction_details, GDKRPC_json** transaction);
 
 /**
  * Sign the user's inputs to a transaction.
@@ -366,7 +356,7 @@ GDK_API int GDKRPC_create_transaction(
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
 GDK_API int GDKRPC_sign_transaction(
-    struct GA_session* session, const GDKRPC_json* transaction_details, struct GA_auth_handler** call);
+    struct GDKRPC_session* session, const GDKRPC_json* transaction_details, struct GA_auth_handler** call);
 
 /**
  * Broadcast a non-Green signed transaction to the P2P network.
@@ -376,7 +366,7 @@ GDK_API int GDKRPC_sign_transaction(
  * :param tx_hash: Destination for the resulting transactions hash.
  *|     Returned string should be freed using `GA_destroy_string`.
  */
-GDK_API int GDKRPC_broadcast_transaction(struct GA_session* session, const char* transaction_hex, char** tx_hash);
+GDK_API int GDKRPC_broadcast_transaction(struct GDKRPC_session* session, const char* transaction_hex, char** tx_hash);
 
 /**
  * Send a transaction created by GA_create_transaction and signed by GA_sign_transaction.
@@ -387,14 +377,14 @@ GDK_API int GDKRPC_broadcast_transaction(struct GA_session* session, const char*
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
 GDK_API int GDKRPC_send_transaction(
-    struct GA_session* session, const GDKRPC_json* transaction_details, struct GA_auth_handler** call);
+    struct GDKRPC_session* session, const GDKRPC_json* transaction_details, struct GA_auth_handler** call);
 
 /**
  * Request an email containing the user's nLockTime transactions.
  *
  * :param session: The session to use.
  */
-GDK_API int GDKRPC_send_nlocktimes(struct GA_session* session);
+GDK_API int GDKRPC_send_nlocktimes(struct GDKRPC_session* session);
 
 /**
  * Add a transaction memo to a user's GreenAddress transaction.
@@ -405,7 +395,7 @@ GDK_API int GDKRPC_send_nlocktimes(struct GA_session* session);
  * :param memo_type: The type of memo to set, either GA_MEMO_USER or GA_MEMO_BIP70.
  */
 GDK_API int GDKRPC_set_transaction_memo(
-    struct GA_session* session, const char* txhash_hex, const char* memo, uint32_t memo_type);
+    struct GDKRPC_session* session, const char* txhash_hex, const char* memo, uint32_t memo_type);
 
 /**
  * Get the current network's fee estimates.
@@ -421,7 +411,7 @@ GDK_API int GDKRPC_set_transaction_memo(
  * for a transaction to confirm from 1 to 24 blocks.
  *
  */
-GDK_API int GDKRPC_get_fee_estimates(struct GA_session* session, GDKRPC_json** estimates);
+GDK_API int GDKRPC_get_fee_estimates(struct GDKRPC_session* session, GDKRPC_json** estimates);
 
 /**
  * Get the user's mnemonic passphrase.
@@ -433,7 +423,7 @@ GDK_API int GDKRPC_get_fee_estimates(struct GA_session* session, GDKRPC_json** e
  *|     27 words long and will require the password to use for logging in.
  *|     Returned string should be freed using `GA_destroy_string`.
  */
-GDK_API int GDKRPC_get_mnemonic_passphrase(struct GA_session* session, const char* password, char** mnemonic);
+GDK_API int GDKRPC_get_mnemonic_passphrase(struct GDKRPC_session* session, const char* password, char** mnemonic);
 
 /**
  * Get the two factor configuration for the current user.
@@ -442,7 +432,7 @@ GDK_API int GDKRPC_get_mnemonic_passphrase(struct GA_session* session, const cha
  * :param config: Destination for the returned :ref:`configuration`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_twofactor_config(struct GA_session* session, GDKRPC_json** config);
+GDK_API int GDKRPC_get_twofactor_config(struct GDKRPC_session* session, GDKRPC_json** config);
 
 /**
  * Change settings
@@ -452,7 +442,7 @@ GDK_API int GDKRPC_get_twofactor_config(struct GA_session* session, GDKRPC_json*
  * :param call: Destination for the resulting GA_auth_handler.
  *|     Returned GA_auth_handler should be freed using `GA_destroy_auth_handler`.
  */
-GDK_API int GDKRPC_change_settings(struct GA_session* session, const GDKRPC_json* settings, struct GA_auth_handler** call);
+GDK_API int GDKRPC_change_settings(struct GDKRPC_session* session, const GDKRPC_json* settings, struct GA_auth_handler** call);
 
 /**
  * Get settings
@@ -461,7 +451,7 @@ GDK_API int GDKRPC_change_settings(struct GA_session* session, const GDKRPC_json
  * :param settings: Destination for the current :ref:`settings`.
  *|     Returned GDKRPC_json should be freed using `GA_destroy_json`.
  */
-GDK_API int GDKRPC_get_settings(struct GA_session* session, GDKRPC_json** settings);
+GDK_API int GDKRPC_get_settings(struct GDKRPC_session* session, GDKRPC_json** settings);
 
 #ifndef SWIG
 /**
@@ -480,7 +470,7 @@ GDK_API int GDKRPC_get_settings(struct GA_session* session, GDKRPC_json** settin
  * the handler with a :ref:`session-event` notification.
  *
  */
-GDK_API int GDKRPC_set_notification_handler(struct GA_session* session, GA_notification_handler handler, void* context);
+GDK_API int GDKRPC_set_notification_handler(struct GDKRPC_session* session, GA_notification_handler handler, void* context);
 
 GDK_API int GDKRPC_convert_json_to_string(const GDKRPC_json* json, char** output);
 

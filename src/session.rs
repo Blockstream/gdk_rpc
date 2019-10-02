@@ -1,8 +1,4 @@
-use std::collections::HashSet;
 use std::mem::transmute;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
 use serde_json::Value;
 
@@ -14,7 +10,7 @@ use crate::GDKRPC_json;
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct GA_session {
+pub struct GDKRPC_session {
     pub settings: Settings,
     pub network: Option<&'static Network>,
     pub wallet: Option<Wallet>,
@@ -22,9 +18,9 @@ pub struct GA_session {
         Option<(extern "C" fn(*const libc::c_void, *const GDKRPC_json), *const libc::c_void)>,
 }
 
-impl GA_session {
-    fn new() -> *mut GA_session {
-        let sess = GA_session {
+impl GDKRPC_session {
+    pub fn new() -> *mut GDKRPC_session {
+        let sess = GDKRPC_session {
             settings: Settings::default(),
             network: None,
             wallet: None,
@@ -64,65 +60,4 @@ impl GA_session {
             warn!("no registered handler to receive notification");
         }
     }
-}
-
-pub struct SessionManager {
-    sessions: HashSet<*mut GA_session>,
-}
-unsafe impl Send for SessionManager {}
-
-// TODO: figure out why clippy is complaining here
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-impl SessionManager {
-    pub fn new() -> Arc<Mutex<Self>> {
-        Arc::new(Mutex::new(SessionManager {
-            sessions: HashSet::new(),
-        }))
-    }
-
-    pub fn register(&mut self) -> *mut GA_session {
-        let sess = GA_session::new();
-        debug!("SessionManager::register({:?})", sess);
-        assert!(self.sessions.insert(sess));
-        sess
-    }
-
-    pub fn get(&self, sess: *const GA_session) -> Result<&GA_session, Error> {
-        if !self.sessions.contains(&(sess as *mut GA_session)) {
-            throw!("session is unmanaged");
-        };
-        Ok(unsafe { &*sess })
-    }
-
-    pub fn get_mut(&self, sess: *mut GA_session) -> Result<&mut GA_session, Error> {
-        if !self.sessions.contains(&sess) {
-            throw!("session is unmanaged");
-        }
-        Ok(unsafe { &mut *sess })
-    }
-
-    pub fn remove(&mut self, sess: *mut GA_session) -> Result<(), Error> {
-        debug!("SessionManager::remove({:?})", sess);
-        if !self.sessions.remove(&sess) {
-            throw!("session is unmanaged");
-        }
-        unsafe { drop(&*sess) };
-        Ok(())
-    }
-
-    pub fn tick(&self) -> Result<(), Error> {
-        info!("tick(), {} active sessions", self.sessions.len());
-        for sess in &self.sessions {
-            let sess = unsafe { &mut **sess };
-            sess.tick()?;
-        }
-        Ok(())
-    }
-}
-
-pub fn spawn_ticker(manager: Arc<Mutex<SessionManager>>) {
-    thread::spawn(move || loop {
-        manager.lock().unwrap().tick().expect("tick failed");
-        thread::sleep(Duration::from_secs(5));
-    });
 }
