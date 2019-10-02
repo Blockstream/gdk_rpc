@@ -9,13 +9,17 @@ use url::Url;
 use crate::errors::{Error, OptionExt};
 
 #[derive(Debug, Serialize)]
+pub struct RpcConfig {
+    pub url: String,
+    pub cred: Option<(String, String)>, // (username, password)
+    pub cookie: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct Network {
     name: String,
     network: String,
-
-    rpc_url: String,
-    rpc_cred: Option<(String, String)>, // (username, password)
-    rpc_cookie: Option<String>,
+    rpc: RpcConfig,
 
     bech32_prefix: String,
     p2pkh_version: u32,
@@ -55,9 +59,11 @@ lazy_static! {
             Network {
                 name: "Regtest".to_string(),
                 network: "regtest".to_string(),
-                rpc_url: rpc_url.clone(),
-                rpc_cred: None,
-                rpc_cookie: rpc_cookie.clone(),
+                rpc: RpcConfig {
+                    url: rpc_url.clone(),
+                    cred: None,
+                    cookie: rpc_cookie.clone(),
+                },
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
 
@@ -84,9 +90,11 @@ lazy_static! {
             Network {
                 name: "Elements Regtest".to_string(),
                 network: "elementsregtest".to_string(),
-                rpc_url,
-                rpc_cred: None,
-                rpc_cookie: rpc_cookie,
+                rpc: RpcConfig {
+                    url: rpc_url,
+                    cred: None,
+                    cookie: rpc_cookie,
+                },
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
 
@@ -113,12 +121,14 @@ lazy_static! {
             Network {
                 name: "Regtest LAN".to_string(),
                 network: "mainnet".to_string(),
-                rpc_url: "http://192.168.2.108:18443".to_string(),
-                rpc_cred: Some((
-                    "satoshi".to_string(),
-                    "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string(),
-                )),
-                rpc_cookie: None,
+                rpc: RpcConfig {
+                    url: "http://192.168.2.108:18443".to_string(),
+                    cred: Some((
+                        "satoshi".to_string(),
+                        "02hMwUvA8iu9DFsboCB3JaE7Wc8Oix4XdBA2fjhYzy4=".to_string(),
+                    )),
+                    cookie: None,
+                },
                 tx_explorer_url: "https://blockstream.info/tx/".to_string(),
                 address_explorer_url: "https://blockstream.info/address/".to_string(),
 
@@ -165,16 +175,20 @@ impl Network {
         NETWORKS.get(id)
     }
 
-    pub fn connect(&self, wallet: Option<String>) -> Result<Client, Error> {
-        let cred = self
-            .rpc_cred
+    pub fn connect(&self, wallet: Option<&str>) -> Result<Client, Error> {
+        Network::connect_with(&self.rpc, wallet)
+    }
+
+    pub fn connect_with(rpc: &RpcConfig, wallet: Option<&str>) -> Result<Client, Error> {
+        let cred = rpc
+            .cred
             .clone()
-            .or_else(|| self.rpc_cookie.as_ref().and_then(|path| read_cookie(path).ok()))
+            .or_else(|| rpc.cookie.as_ref().and_then(|path| read_cookie(path).ok()))
             .or_err("missing rpc credentials")?;
 
         let (rpc_user, rpc_pass) = cred;
 
-        let mut rpc_url = Url::parse(&self.rpc_url)?;
+        let mut rpc_url = Url::parse(&rpc.url)?;
         if let Some(wallet) = wallet {
             rpc_url = rpc_url.join(&format!("/wallet/{}", wallet))?;
         }
